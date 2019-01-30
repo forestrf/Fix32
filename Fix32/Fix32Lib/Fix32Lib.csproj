@@ -43,7 +43,6 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Class1.cs" />
     <Compile Include="Fix32.cs" />
     <Compile Include="Fix32Random.cs" />
     <Compile Include="Fix32SinLut.cs" />

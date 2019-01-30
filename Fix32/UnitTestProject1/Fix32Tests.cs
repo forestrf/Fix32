@@ -163,7 +163,7 @@ public class Fix32Tests {
 		for (int i = 0; i < terms1.Length; ++i) {
 			var actual = terms1[i].Add(terms2[i]);
 			var expected = expecteds[i];
-			Assert.AreEqual(expected, actual, terms1[i] + " + " + terms2[i]);
+			Assert.AreEqual(expected, actual, terms1[i].ToStringExt() + " + " + terms2[i].ToStringExt());
 		}
 
 
@@ -186,9 +186,9 @@ public class Fix32Tests {
 		var terms2 = new Fix32[] { Fix32.One, (-2).ToFix32(), (1.5m).ToFix32(), (2).ToFix32(), (-1).ToFix32() };
 		var expecteds = new Fix32[] { Fix32.MinValue, Fix32.One, (-1.5m).ToFix32(), (-1).ToFix32(), Fix32.MaxValue };
 		for (int i = 0; i < terms1.Length; ++i) {
-			var actual = terms1[i] - terms2[i];
+			var actual = terms1[i].Sub(terms2[i]);
 			var expected = expecteds[i];
-			Assert.AreEqual(expected, actual, terms1[i] + " - " + terms2[i]);
+			Assert.AreEqual(expected, actual, terms1[i].ToStringExt() + " - " + terms2[i].ToStringExt());
 		}
 
 		for (int i = 0; i < m_testCases.Length; ++i) {
@@ -221,7 +221,7 @@ public class Fix32Tests {
 
 	[Test]
 	public void T007_EqualityInequalityComparisonOperators() {
-		List<Fix32> sources = m_testCases.Cast<Fix32>().ToList();
+		List<Fix32> sources = m_testCases.Select(t => (Fix32) t).ToList();
 		foreach (var op1 in sources) {
 			foreach (var op2 in sources) {
 				var d1 = (double) op1;
@@ -240,7 +240,7 @@ public class Fix32Tests {
 
 	[Test]
 	public void T008_CompareTo() {
-		var nums = m_testCases.Cast<Fix32>().ToArray();
+		var nums = m_testCases.Select(t => (Fix32) t).ToArray();
 		var numsDecimal = nums.Select(t => t.ToDecimal()).ToArray();
 		Array.Sort(nums);
 		Array.Sort(numsDecimal);
@@ -277,50 +277,56 @@ public class Fix32Tests {
 		for (int i = 0; i < m_testCases.Length; ++i) {
 			var actual = ((Fix32) m_testCases[i]).Abs();
 			var expected = Math.Abs(((Fix32) m_testCases[i]).ToDouble()).ToFix32();
-			Assert.AreEqual(expected, actual, sources[i].ToStringExt());
+
+			Assert.AreEqual(expected, actual, m_testCases[i].ToFix32().ToStringExt());
 		}
 	}
 
 	[Test]
 	public void T011_FastAbs() {
-		Assert.AreEqual(Fix32.MinValue, Fix32.MinValue.Abs()); // Wrong result, but it is spected
+		Assert.AreEqual(Fix32.MinValue, Fix32.MinValue.AbsFast()); // Wrong result, but it is spected
+
 		var sources = new Fix32[] { Fix32.MaxValue.Neg(), (-1).ToFix32(), Fix32.Zero, Fix32.One, Fix32.MaxValue.Sub(Fix32.One), Fix32.MaxValue };
 		var expecteds = new Fix32[] { Fix32.MaxValue, Fix32.One, Fix32.Zero, Fix32.One, Fix32.MaxValue.Sub(Fix32.One), Fix32.MaxValue };
 		for (int i = 0; i < sources.Length; ++i) {
-			var actual = sources[i].Abs();
+			var actual = sources[i].AbsFast();
 			var expected = expecteds[i];
 			Assert.AreEqual(expected, actual, sources[i].ToStringExt());
 		}
 
 		for (int i = 0; i < m_testCases.Length; ++i) {
-			var actual = ((Fix32) m_testCases[i]).Abs();
-			var expected = Math.Abs(((Fix32) m_testCases[i]).ToDouble()).ToFix32();
-			Assert.AreEqual(expected, actual, sources[i].ToStringExt());
+			var actual = ((Fix32) m_testCases[i]).AbsFast();
+			var expected = (Fix32) m_testCases[i];
+			if (expected != Fix32.MinValue)
+				expected = Math.Abs(((Fix32) m_testCases[i]).ToDouble()).ToFix32();
+
+			Assert.AreEqual(expected, actual, m_testCases[i].ToFix32().ToStringExt());
 		}
 	}
 
 	[Test]
 	public void T012_Floor() {
-		var sources = new[] { -5.1m, -1, 0, 1, 5.1m, (decimal) Fix64.MaxValue, (decimal) Fix64.MinValue };
-		var expecteds = new[] { -6m, -1, 0, 1, 5m, (int) Fix64.MaxValue, (decimal) Fix64.MinValue };
+		var sources = new[] { -5.1m, -1, 0, 1, 5.1m, Fix32.MaxValue.ToDecimal(), Fix32.MinValue.ToDecimal() };
+		var expecteds = new[] { -6m, -1, 0, 1, 5m, Fix32.MaxValue.ToInt(), Fix32.MinValue.ToDecimal() };
 		for (int i = 0; i < sources.Length; ++i) {
-			var actual = (decimal) Fix64.Floor((Fix64) sources[i]);
+			var actual = sources[i].ToFix32().Floor().ToDecimal();
 			var expected = expecteds[i];
-			Assert.AreEqual(expected, actual, sources[i].ToStringExt());
+			Assert.AreEqual(expected, actual, sources[i].ToString());
 		}
 	}
 
 	[Test]
 	public void T013_Ceiling() {
-		var sources = new[] { -5.1m, -1, 0, 1, 5.1m, (decimal) Fix64.MaxValue, (decimal) Fix64.MinValue };
-		var expecteds = new[] { -5m, -1, 0, 1, 6m, (decimal) Fix64.MaxValue, (decimal) Fix64.MinValue };
+		var sources = new[] { -5.1m, -1, 0, 1, 5.1m, Fix32.MaxValue.ToDecimal(), Fix32.MinValue.ToDecimal() };
+		var expecteds = new[] { -5m, -1, 0, 1, 6m, Fix32.MaxValue.ToDecimal(), Fix32.MinValue.ToDecimal() };
 		for (int i = 0; i < sources.Length; ++i) {
-			var actual = (decimal) Fix64.Ceiling((Fix64) sources[i]);
+			var actual = sources[i].ToFix32().Ceiling().ToDecimal();
 			var expected = expecteds[i];
-			Assert.AreEqual(expected, actual, sources[i].ToStringExt());
+			Assert.AreEqual(expected, actual, sources[i].ToString());
 		}
 	}
 
+	/*
 	[Test]
 	public void T014_Round() {
 		var sources = new[] { 5.5m, 5.4m, 4.6m, 4.5m, 1, 0, -1, -4.4m, -4.5m, -5.1m, -5.5m };
@@ -634,7 +640,7 @@ public class Fix32Tests {
         Console.WriteLine("Fix64.Sin time = {0}ms, Math.Sin time = {1}ms", swf.ElapsedMilliseconds, swd.ElapsedMilliseconds);
     }
 	*/
-
+	/*
 	[Test]
 	public void Sin() {
 		Assert.AreEqual(Fix64.Zero, Fix64.Sin(Fix64.Zero), "sin(0)");
@@ -784,7 +790,7 @@ public class Fix32Tests {
 		Assert.True(Fix64.Tan(-Fix64.PiOver2 - (Fix64) 0.001) > Fix64.Zero);
 		Assert.True(Fix64.Tan(-Fix64.PiOver2 + (Fix64) 0.001) < Fix64.Zero);
 
-		for (double angle = 0;/*-2 * Math.PI;*/ angle <= 2 * Math.PI; angle += 0.0001) {
+		for (double angle = 0;/*-2 * Math.PI;*//* angle <= 2 * Math.PI; angle += 0.0001) {
 			var f = (Fix64) angle;
 			var actualF = Fix64.Tan(f);
 			var expected = (decimal) Math.Tan(angle);
@@ -858,7 +864,7 @@ public class Fix32Tests {
         Console.WriteLine("Fix64.Atan time = {0}ms, Math.Atan time = {1}ms", swf.ElapsedMilliseconds, swd.ElapsedMilliseconds);
     }
 	*/
-
+	/*
 	[Test]
 	public void Atan2() {
 		var deltas = new List<decimal>();
@@ -943,6 +949,6 @@ public class Fix32Tests {
 #endif
 
 	static double Saturate(double v) {
-		return Math.Max((double) Fix64.MinValue, Math.Min((double) Fix64.MaxValue, v));
+		return Math.Max(Fix32.MinValue.ToDouble(), Math.Min(Fix32.MaxValue.ToDouble(), v));
 	}
 }
