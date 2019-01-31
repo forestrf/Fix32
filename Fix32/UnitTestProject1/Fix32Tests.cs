@@ -565,10 +565,31 @@ public class Fix32Tests {
 			else {
 				var expected = Math.Sqrt(f.ToDouble());
 				var actual = f.Sqrt().ToDouble();
-				Assert.AreEqual(expected, actual, maxDelta, "sqrt(" + f + ")" + Delta(expected, actual, deltas));
+				Assert.AreEqual(expected, actual, maxDelta, "sqrt(" + f.ToStringExt() + ")" + Delta(expected, actual, deltas));
 			}
 		}
 		DeltasStatistics(deltas);
+	}
+
+	[Test]
+	public void T021_Modulus() {
+		foreach (var operand1 in TestCases) {
+			foreach (var operand2 in TestCases) {
+				var f1 = (Fix32) operand1;
+				var f2 = (Fix32) operand2;
+
+				if (operand2 == 0) {
+					Assert.AreEqual(f1 >= 0 ? Fix32.MaxValue : Fix32.MinValue, f1.Div(f2));
+				}
+				else {
+					var d1 = f1.ToDouble();
+					var d2 = f2.ToDouble();
+					var actual = f1.Mod(f2).ToDouble();
+					var expected = d1 % d2;
+					Assert.AreEqual(expected, actual, f1.ToStringExt() + " % " + f2.ToStringExt());
+				}
+			}
+		}
 	}
 
 	/*
@@ -626,33 +647,6 @@ public class Fix32Tests {
 				}
 			}
 		}
-	}
-
-	[Test]
-	public void Modulus() {
-		var deltas = new List<decimal>();
-		foreach (var operand1 in TestCases) {
-			foreach (var operand2 in TestCases) {
-				var f1 = Fix64.FromRaw(operand1);
-				var f2 = Fix64.FromRaw(operand2);
-
-				if (operand2 == 0) {
-					Assert.AreEqual(f1 >= 0 ? Fix64.MaxValue : Fix64.MinValue, f1 / f2);
-				}
-				else {
-					var d1 = (decimal) f1;
-					var d2 = (decimal) f2;
-					var actual = (decimal) (f1 % f2);
-					var expected = d1 % d2;
-					var delta = Math.Abs(expected - actual);
-					deltas.Add(delta);
-					Assert.True(delta <= 60 * Fix64.Precision, string.Format("{0} % {1} = expected {2} but got {3}", f1, f2, expected, actual));
-				}
-			}
-		}
-		Console.WriteLine("Max error: {0} ({1} times precision)", deltas.Max(), deltas.Max() / Fix64.Precision);
-		Console.WriteLine("Average precision: {0} ({1} times precision)", deltas.Average(), deltas.Average() / Fix64.Precision);
-		Console.WriteLine("failed: {0}%", deltas.Count(d => d > Fix64.Precision) * 100.0 / deltas.Count);
 	}
 
 	/*

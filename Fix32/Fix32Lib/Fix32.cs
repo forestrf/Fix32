@@ -135,6 +135,17 @@ public static partial class Fix32Ext {
 	public static Fix32 SubFast(this Fix32 x, Fix32 y) {
 		return (Fix32) ((int) x - (int) y);
 	}
+	/// <summary>
+	/// Negate
+	/// </summary>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static Fix32 Neg(this Fix32 x) {
+#if USE_DOUBLES
+		return (-x.ToDouble()).ToFix32();
+#endif
+		//return new Fix64(-x.RawValue);
+		return (Fix32) ((int) x == MIN_VALUE ? MAX_VALUE : -(int) x);
+	}
 
 	/// <summary>
 	/// Returns a number indicating the sign of a Fix64 number.
@@ -492,6 +503,27 @@ public static partial class Fix32Ext {
 		*/
 	}
 
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static Fix32 Mod(this Fix32 x, Fix32 y) {
+#if USE_DOUBLES
+		return (x.ToDouble() % y.ToDouble()).ToFix32();
+#endif
+		return (Fix32) (
+			(int) x == MIN_VALUE & (int) y == -1 ?
+			0 :
+			(int) x % (int) y);
+	}
+
+	/// <summary>
+	/// Performs modulo as fast as possible; throws if x == MinValue and y == -1.
+	/// Use the operator (%) for a more reliable but slower modulo.
+	/// </summary>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static Fix32 ModFast(this Fix32 x, Fix32 y) {
+		return (Fix32) ((int) x % (int) y);
+	}
+
+
 	/// <summary>
 	/// Returns 2 raised to the specified power.
 	/// </summary>
@@ -587,38 +619,6 @@ public static partial class Fix32Ext {
 		while ((x & 0xF000000000000000) == 0) { result += 4; x <<= 4; }
 		while ((x & 0x8000000000000000) == 0) { result += 1; x <<= 1; }
 		return result;
-	}
-
-	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	public static Fix32 Mod(this Fix32 x, Fix32 y) {
-#if USE_DOUBLES
-		return (x.ToDouble() % y.ToDouble()).ToFix32();
-#endif
-		return (Fix32) (
-			(int) x == MIN_VALUE & (int) y == -1 ?
-			0 :
-			(int) x % (int) y);
-	}
-
-	/// <summary>
-	/// Performs modulo as fast as possible; throws if x == MinValue and y == -1.
-	/// Use the operator (%) for a more reliable but slower modulo.
-	/// </summary>
-	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	public static Fix32 ModFast(this Fix32 x, Fix32 y) {
-		return (Fix32) ((int) x % (int) y);
-	}
-
-	/// <summary>
-	/// Negate
-	/// </summary>
-	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	public static Fix32 Neg(this Fix32 x) {
-#if USE_DOUBLES
-		return (-x.ToDouble()).ToFix32();
-#endif
-		//return new Fix64(-x.RawValue);
-		return (Fix32) ((int) x == MIN_VALUE ? MAX_VALUE : -(int) x);
 	}
 
 	/// <summary>
