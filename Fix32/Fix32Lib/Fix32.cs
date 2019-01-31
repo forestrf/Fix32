@@ -42,20 +42,20 @@ public static partial class Fix32Ext {
 
 	internal const int MAX_VALUE = int.MaxValue;
 	internal const int MIN_VALUE = int.MinValue;
-	internal const int MAX_INT_VALUE = int.MaxValue >> FRACTIONAL_PLACES;
-	internal const int MIN_INT_VALUE = int.MinValue >> FRACTIONAL_PLACES;
+	internal const int MAX_INT_VALUE = int.MaxValue >> FRACTIONAL_BITS;
+	internal const int MIN_INT_VALUE = int.MinValue >> FRACTIONAL_BITS;
 	public const int NUM_BITS = 32;
-	public const int FRACTIONAL_PLACES = 14;
-	internal const int SIGNED_INTEGER_PLACES = NUM_BITS - FRACTIONAL_PLACES;
+	public const int FRACTIONAL_BITS = 14;
+	internal const int SIGNED_INTEGER_PLACES = NUM_BITS - FRACTIONAL_BITS;
 	internal const int SIGN_MASK = unchecked((int) (1U << NUM_BITS_MINUS_ONE));
 
 	internal const int NUM_BITS_MINUS_ONE = NUM_BITS - 1;
-	internal const int ONE = 1 << FRACTIONAL_PLACES;
+	internal const int ONE = 1 << FRACTIONAL_BITS;
 	internal const int FRACTIONAL_MASK = ONE - 1;
 	internal const int INTEGER_MASK = ~FRACTIONAL_MASK;
-	internal const int LOG2MAX = (NUM_BITS - 1) << FRACTIONAL_PLACES;
-	internal const int LOG2MIN = -(NUM_BITS << FRACTIONAL_PLACES);
-	internal const int LUT_SIZE_RS = FRACTIONAL_PLACES / 2 - 1;
+	internal const int LOG2MAX = (NUM_BITS - 1) << FRACTIONAL_BITS;
+	internal const int LOG2MIN = -(NUM_BITS << FRACTIONAL_BITS);
+	internal const int LUT_SIZE_RS = FRACTIONAL_BITS / 2 - 1;
 	internal const int LUT_SIZE = PI_OVER_2 >> LUT_SIZE_RS;
 
 	static readonly Fix32 LutInterval = (LUT_SIZE - 1).ToFix32().Div(Fix32.PiOver2);
@@ -152,7 +152,7 @@ public static partial class Fix32Ext {
 	/// </summary>
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public static Fix32 Sign(this Fix32 x) {
-		const int RS = NUM_BITS_MINUS_ONE - FRACTIONAL_PLACES;
+		const int RS = NUM_BITS_MINUS_ONE - FRACTIONAL_BITS;
 		return (Fix32) ((((int) x >> RS) | (int) (((uint) -(int) x) >> RS)) & INTEGER_MASK);
 	}
 
@@ -240,7 +240,7 @@ public static partial class Fix32Ext {
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public static Fix32 RoundFast(this Fix32 x) {
 		// https://sestevenson.wordpress.com/2009/08/19/rounding-in-fixed-point-number-conversions/
-		int odd = ((int) x & ONE) >> FRACTIONAL_PLACES;
+		int odd = ((int) x & ONE) >> FRACTIONAL_BITS;
 		return (Fix32) (((int) x + (ONE / 2 - 1) + odd) & INTEGER_MASK);
 	}
 
@@ -252,7 +252,7 @@ public static partial class Fix32Ext {
 #if USE_DOUBLES
 		return Math.Round(x.ToDouble() * y.ToDouble()).ToFix32();
 #endif
-		long multLong = ((long) x * (long) y) >> FRACTIONAL_PLACES;
+		long multLong = ((long) x * (long) y) >> FRACTIONAL_BITS;
 
 		int finalSign = (int) x ^ (int) y;
 
@@ -266,7 +266,7 @@ public static partial class Fix32Ext {
 	/// </summary>
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public static Fix32 MulFast(this Fix32 x, Fix32 y) {
-		return (Fix32) (((long) x * (long) y) >> FRACTIONAL_PLACES);
+		return (Fix32) (((long) x * (long) y) >> FRACTIONAL_BITS);
 	}
 
 	/// <summary>
@@ -283,7 +283,7 @@ public static partial class Fix32Ext {
 			return xl >= 0 ? Fix32.MaxValue : Fix32.MinValue; // Branched version of the previous code, for clarity. Slower
 		}
 
-		long a = xl << FRACTIONAL_PLACES;
+		long a = xl << FRACTIONAL_BITS;
 		long b = (int) y;
 		long r = a / b;
 		if (r > MAX_VALUE) return Fix32.MaxValue;
@@ -309,7 +309,7 @@ public static partial class Fix32Ext {
 	/// </summary>
 	public static Fix32 DivFastOverflow(this Fix32 x, Fix32 y) {
 #if true
-		long c = (((long) x) << FRACTIONAL_PLACES) / (long) y;
+		long c = (((long) x) << FRACTIONAL_BITS) / (long) y;
 		return (Fix32) c;
 #endif
 		/*
@@ -338,28 +338,28 @@ public static partial class Fix32Ext {
 		// This implementation is based on Clay. S. Turner's fast binary logarithm
 		// algorithm (C. S. Turner,  "A Fast Binary Logarithm Algorithm", IEEE Signal
 		//     Processing Mag., pp. 124,140, Sep. 2010.)
-		
+
 		//https://github.com/dmoulding/log2fix/blob/master/log2fix.c
 
-		int b = 1 << (FRACTIONAL_PLACES - 1);
+		int b = 1 << (FRACTIONAL_BITS - 1);
 		int y = 0;
 
-		var rawX = (int) x;
-		while (rawX < ONE) {
+		int rawX = (int) x;
+		while (rawX < 1 << FRACTIONAL_BITS) {
 			rawX <<= 1;
-			y -= ONE;
+			y -= 1 << FRACTIONAL_BITS;
 		}
 
-		while (rawX >= (ONE * 2)) {
+		while (rawX >= 2 << FRACTIONAL_BITS) {
 			rawX >>= 1;
-			y += ONE;
+			y += 1 << FRACTIONAL_BITS;
 		}
 
 		ulong z = (ulong) rawX;
 
-		for (int i = 0; i < FRACTIONAL_PLACES; i++) {
-			z = z * z >> FRACTIONAL_PLACES;
-			if (z >= ONE * 2) {
+		for (int i = 0; i < FRACTIONAL_BITS; i++) {
+			z = z * z >> FRACTIONAL_BITS;
+			if (z >= 2 << FRACTIONAL_BITS) {
 				z >>= 1;
 				y += b;
 			}
@@ -381,6 +381,115 @@ public static partial class Fix32Ext {
 		return Math.Log(x.ToDouble()).ToFix32();
 #endif
 		return Log2(x).Mul(Fix32.Ln2);
+	}
+
+	/// <summary>
+	/// Returns the square root of a specified number.
+	/// </summary>
+	/// <exception cref="ArgumentOutOfRangeException">
+	/// The argument was negative.
+	/// </exception>
+	public static Fix32 Sqrt(this Fix32 x) {
+#if USE_DOUBLES
+		return Math.Sqrt(x.ToDouble()).ToFix32();
+#endif
+		if ((int) x < 0) {
+			// We cannot represent infinities like Single and Double, and Sqrt is
+			// mathematically undefined for x < 0. So we just throw an exception.
+			throw new ArgumentOutOfRangeException("Negative value passed to Sqrt", "x");
+		}
+
+		/*
+		uint t, q, b, r;
+		r = (uint) x;
+		b = 0x40000000;
+		q = 0;
+		while (b > 0x40) {
+			t = q + b;
+			if (r >= t) {
+				r -= t;
+				q = t + b; // equivalent to q += 2*b
+			}
+			r <<= 1;
+			b >>= 1;
+		}
+		q >>= 8;
+		return (Fix32) q;
+		*/
+
+		long xx = (long) x << FRACTIONAL_BITS;
+		if (xx <= 1) return x;
+
+		int s = 1;
+		long x1 = xx - 1;
+		if (x1 > 4294967295) { s += 16; x1 >>= 32; }
+		if (x1 > 65535) { s += 8; x1 >>= 16; }
+		if (x1 > 255) { s += 4; x1 >>= 8; }
+		if (x1 > 15) { s += 2; x1 >>= 4; }
+		if (x1 > 3) { s += 1; }
+		long g0 = 1L << s;
+		long g1 = (g0 + (xx >> s)) >> 1;
+		while (g1 < g0) {
+			g0 = g1;
+			g1 = (g0 + (xx / g0)) >> 1;
+		}
+		return (Fix32) (g0);
+
+		/*
+		var xl = (int) x;
+
+		var num = (uint) xl;
+		var result = 0U;
+
+		// second-to-top bit
+		var bit = 1U << (NUM_BITS - 2);
+
+		while (bit > num) {
+			bit >>= 2;
+		}
+
+		// The main part is executed twice, in order to avoid
+		// using 128 bit values in computations.
+		for (var i = 0; i < 2; ++i) {
+			// First we get the top 48 bits of the answer.
+			while (bit != 0) {
+				if (num >= result + bit) {
+					num -= result + bit;
+					result = (result >> 1) + bit;
+				}
+				else {
+					result = result >> 1;
+				}
+				bit >>= 2;
+			}
+
+			if (i == 0) {
+				// Then process it again to get the lowest 16 bits.
+				if (num > (1U << (NUM_BITS / 2)) - 1) {
+					// The remainder 'num' is too large to be shifted left
+					// by 32, so we have to add 1 to result manually and
+					// adjust 'num' accordingly.
+					// num = a - (result + 0.5)^2
+					//       = num + result^2 - (result + 0.5)^2
+					//       = num - result - 0.5
+					num -= result;
+					num = (num << (NUM_BITS / 2)) - (1U << NUM_BITS_MINUS_ONE);
+					result = (result << (NUM_BITS / 2)) + (1U << NUM_BITS_MINUS_ONE);
+				}
+				else {
+					num <<= (NUM_BITS / 2);
+					result <<= (NUM_BITS / 2);
+				}
+
+				bit = 1U << (NUM_BITS / 2 - 2);
+			}
+		}
+		// Finally, if next bit would have been 1, round the result upwards.
+		if (num > result) {
+			++result;
+		}
+		return (Fix32) (int) result;
+		*/
 	}
 
 	/// <summary>
@@ -510,76 +619,6 @@ public static partial class Fix32Ext {
 #endif
 		//return new Fix64(-x.RawValue);
 		return (Fix32) ((int) x == MIN_VALUE ? MAX_VALUE : -(int) x);
-	}
-
-	/// <summary>
-	/// Returns the square root of a specified number.
-	/// </summary>
-	/// <exception cref="ArgumentOutOfRangeException">
-	/// The argument was negative.
-	/// </exception>
-	public static Fix32 Sqrt(this Fix32 x) {
-#if USE_DOUBLES
-		return Math.Sqrt(x.ToDouble()).ToFix32();
-#endif
-		var xl = (int) x;
-		if (xl < 0) {
-			// We cannot represent infinities like Single and Double, and Sqrt is
-			// mathematically undefined for x < 0. So we just throw an exception.
-			throw new ArgumentOutOfRangeException("Negative value passed to Sqrt", "x");
-		}
-
-		var num = (uint) xl;
-		var result = 0U;
-
-		// second-to-top bit
-		var bit = 1U << (NUM_BITS - 2);
-
-		while (bit > num) {
-			bit >>= 2;
-		}
-
-		// The main part is executed twice, in order to avoid
-		// using 128 bit values in computations.
-		for (var i = 0; i < 2; ++i) {
-			// First we get the top 48 bits of the answer.
-			while (bit != 0) {
-				if (num >= result + bit) {
-					num -= result + bit;
-					result = (result >> 1) + bit;
-				}
-				else {
-					result = result >> 1;
-				}
-				bit >>= 2;
-			}
-
-			if (i == 0) {
-				// Then process it again to get the lowest 16 bits.
-				if (num > (1U << (NUM_BITS / 2)) - 1) {
-					// The remainder 'num' is too large to be shifted left
-					// by 32, so we have to add 1 to result manually and
-					// adjust 'num' accordingly.
-					// num = a - (result + 0.5)^2
-					//       = num + result^2 - (result + 0.5)^2
-					//       = num - result - 0.5
-					num -= result;
-					num = (num << (NUM_BITS / 2)) - (1U << NUM_BITS_MINUS_ONE);
-					result = (result << (NUM_BITS / 2)) + (1U << NUM_BITS_MINUS_ONE);
-				}
-				else {
-					num <<= (NUM_BITS / 2);
-					result <<= (NUM_BITS / 2);
-				}
-
-				bit = 1U << (NUM_BITS / 2 - 2);
-			}
-		}
-		// Finally, if next bit would have been 1, round the result upwards.
-		if (num > result) {
-			++result;
-		}
-		return (Fix32) (int) result;
 	}
 
 	/// <summary>

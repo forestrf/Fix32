@@ -555,7 +555,7 @@ public class Fix32Tests {
 	[Test]
 	public void T020_Sqrt() {
 		List<double> deltas = new List<double>();
-		double maxDelta = 8 * (double) Fix32Ext.Precision;
+		double maxDelta = 1 * (double) Fix32Ext.Precision;
 
 		for (int i = 0; i < TestCases.Count; ++i) {
 			var f = (Fix32) TestCases[i];
