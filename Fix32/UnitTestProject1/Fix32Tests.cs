@@ -1,13 +1,13 @@
-﻿using System;
+﻿using NUnit.Framework;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using NUnit.Framework;
 
 public class Fix32Tests {
 	static int OneRaw = (int) Fix32.One;
 
-	int[] m_testCases = new int[] {
+	static List<int> TestCases = new List<int>() {
         // Small numbers
         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
 		-1, -2, -3, -4, -5, -6, -7, -8, -9, -10,
@@ -54,6 +54,11 @@ public class Fix32Tests {
 		-359, 491, 844, 158, -413, -422, -737, -575, -330,
 		-376, 435, -311, 116, 715, -1024, -487, 59, 724, 993
 	};
+
+	static Fix32Tests() {
+		Random r = new Random(0);
+		for (int i = 0; i < 100; i++) TestCases.Add(r.Next());
+	}
 
 	[Test]
 	public void T001_IntToFix64AndBack() {
@@ -174,10 +179,10 @@ public class Fix32Tests {
 		}
 
 
-		for (int i = 0; i < m_testCases.Length; ++i) {
-			for (int j = 0; j < m_testCases.Length; ++j) {
-				var x = (Fix32) m_testCases[i];
-				var y = (Fix32) m_testCases[j];
+		for (int i = 0; i < TestCases.Count; ++i) {
+			for (int j = 0; j < TestCases.Count; ++j) {
+				var x = (Fix32) TestCases[i];
+				var y = (Fix32) TestCases[j];
 
 				double expected = Saturate(x.ToDouble() + y.ToDouble());
 				double actual = x.Add(y).ToDouble();
@@ -198,10 +203,10 @@ public class Fix32Tests {
 			Assert.AreEqual(expected, actual, terms1[i].ToStringExt() + " - " + terms2[i].ToStringExt());
 		}
 
-		for (int i = 0; i < m_testCases.Length; ++i) {
-			for (int j = 0; j < m_testCases.Length; ++j) {
-				var x = (Fix32) m_testCases[i];
-				var y = (Fix32) m_testCases[j];
+		for (int i = 0; i < TestCases.Count; ++i) {
+			for (int j = 0; j < TestCases.Count; ++j) {
+				var x = (Fix32) TestCases[i];
+				var y = (Fix32) TestCases[j];
 
 				double expected = Saturate(x.ToDouble() - y.ToDouble());
 				double actual = x.Sub(y).ToDouble();
@@ -213,7 +218,7 @@ public class Fix32Tests {
 
 	[Test]
 	public void T006_Negation() {
-		foreach (var operand1 in m_testCases) {
+		foreach (var operand1 in TestCases) {
 			var f = (Fix32) operand1;
 			if ((int) f == (int) Fix32.MinValue) {
 				Assert.AreEqual(f.Neg(), Fix32.MaxValue);
@@ -228,7 +233,7 @@ public class Fix32Tests {
 
 	[Test]
 	public void T007_EqualityInequalityComparisonOperators() {
-		List<Fix32> sources = m_testCases.Select(t => (Fix32) t).ToList();
+		List<Fix32> sources = TestCases.Select(t => (Fix32) t).ToList();
 		foreach (var op1 in sources) {
 			foreach (var op2 in sources) {
 				var d1 = op1.ToDouble();
@@ -247,7 +252,7 @@ public class Fix32Tests {
 
 	[Test]
 	public void T008_CompareTo() {
-		var nums = m_testCases.Select(t => (Fix32) t).ToArray();
+		var nums = TestCases.Select(t => (Fix32) t).ToArray();
 		var numsDecimal = nums.Select(t => t.ToDecimal()).ToArray();
 		Array.Sort(nums);
 		Array.Sort(numsDecimal);
@@ -281,11 +286,11 @@ public class Fix32Tests {
 			Assert.AreEqual(expected, actual, sources[i].ToStringExt());
 		}
 
-		for (int i = 0; i < m_testCases.Length; ++i) {
-			var actual = ((Fix32) m_testCases[i]).Abs();
-			var expected = Math.Abs(((Fix32) m_testCases[i]).ToDouble()).ToFix32();
+		for (int i = 0; i < TestCases.Count; ++i) {
+			var actual = ((Fix32) TestCases[i]).Abs();
+			var expected = Math.Abs(((Fix32) TestCases[i]).ToDouble()).ToFix32();
 
-			Assert.AreEqual(expected, actual, m_testCases[i].ToFix32().ToStringExt());
+			Assert.AreEqual(expected, actual, TestCases[i].ToFix32().ToStringExt());
 		}
 	}
 
@@ -301,13 +306,13 @@ public class Fix32Tests {
 			Assert.AreEqual(expected, actual, sources[i].ToStringExt());
 		}
 
-		for (int i = 0; i < m_testCases.Length; ++i) {
-			var actual = ((Fix32) m_testCases[i]).AbsFast();
-			var expected = (Fix32) m_testCases[i];
+		for (int i = 0; i < TestCases.Count; ++i) {
+			var actual = ((Fix32) TestCases[i]).AbsFast();
+			var expected = (Fix32) TestCases[i];
 			if ((int) expected != (int) Fix32.MinValue)
-				expected = Math.Abs(((Fix32) m_testCases[i]).ToDouble()).ToFix32();
+				expected = Math.Abs(((Fix32) TestCases[i]).ToDouble()).ToFix32();
 
-			Assert.AreEqual(expected, actual, m_testCases[i].ToFix32().ToStringExt());
+			Assert.AreEqual(expected, actual, TestCases[i].ToFix32().ToStringExt());
 		}
 	}
 
@@ -333,7 +338,7 @@ public class Fix32Tests {
 		}
 	}
 
-	
+
 	[Test]
 	public void T014_Round() {
 		var sources = new[] { 5.5m, 5.4m, 4.6m, 4.5m, 1, 0, -1, -4.4m, -4.5m, -5.1m, -5.5m };
@@ -356,7 +361,7 @@ public class Fix32Tests {
 			Assert.AreEqual(expected, actual, sources[i].ToString());
 		}
 	}
-	
+
 	[Test]
 	public void T015_BasicMult() {
 		var term1s = new decimal[] { 0m, 1m, -1m, 5m, -5m, 0.5m, -0.5m, -1.0m };
@@ -383,124 +388,135 @@ public class Fix32Tests {
 
 	[Test]
 	public void T016_Mult() {
+		List<double> deltas = new List<double>();
 		var sw = new Stopwatch();
-		for (int i = 0; i < m_testCases.Length; ++i) {
-			for (int j = 0; j < m_testCases.Length; ++j) {
-				var x = (Fix32) m_testCases[i];
-				var y = (Fix32) m_testCases[j];
+		for (int i = 0; i < TestCases.Count; ++i) {
+			for (int j = 0; j < TestCases.Count; ++j) {
+				var x = (Fix32) TestCases[i];
+				var y = (Fix32) TestCases[j];
 				var xM = x.ToDecimal();
 				var yM = y.ToDecimal();
-				var expected = xM * yM;
-				expected =
-					expected > Fix32.MaxValue.ToDecimal() ? Fix32.MaxValue.ToDecimal() :
-					expected < Fix32.MinValue.ToDecimal() ? Fix32.MinValue.ToDecimal() :
-					expected;
+				var expectedF = xM * yM;
+				expectedF =
+					expectedF > Fix32.MaxValue.ToDecimal() ? Fix32.MaxValue.ToDecimal() :
+					expectedF < Fix32.MinValue.ToDecimal() ? Fix32.MinValue.ToDecimal() :
+					expectedF;
 				sw.Start();
-				var actual = x.Mul(y);
+				var actualF = x.Mul(y);
 				sw.Stop();
-				var expextedM = expected.ToFix32().ToDouble();
-				var actualM = actual.ToDouble();
-				Assert.AreEqual(expextedM, actualM, (double) Fix32Ext.Precision, x.ToStringExt() + " * " + y.ToStringExt());
+				var expected = expectedF.ToFix32().ToDouble();
+				var actual = actualF.ToDouble();
+				Assert.AreEqual(expected, actual, (double) Fix32Ext.Precision, x.ToStringExt() + " * " + y.ToStringExt() + Delta(expected, actual, deltas));
 			}
 		}
-		Console.WriteLine("{0} total, {1} per multiplication", sw.Elapsed.TotalMilliseconds, sw.Elapsed.TotalMilliseconds / (m_testCases.Length * m_testCases.Length));
+		Console.WriteLine("{0} total, {1} per multiplication", sw.Elapsed.TotalMilliseconds, sw.Elapsed.TotalMilliseconds / (TestCases.Count * TestCases.Count));
+		DeltasStatistics(deltas);
 	}
 
 	[Test]
 	public void T0161_FastMult() {
+		List<double> deltas = new List<double>();
 		var sw = new Stopwatch();
-		for (int i = 0; i < m_testCases.Length; ++i) {
-			for (int j = 0; j < m_testCases.Length; ++j) {
-				var x = (Fix32) m_testCases[i];
-				var y = (Fix32) m_testCases[j];
+		for (int i = 0; i < TestCases.Count; ++i) {
+			for (int j = 0; j < TestCases.Count; ++j) {
+				var x = (Fix32) TestCases[i];
+				var y = (Fix32) TestCases[j];
 				var xM = x.ToDecimal();
 				var yM = y.ToDecimal();
-				var expected = xM * yM;
-				if (expected > Fix32.MaxValue.ToDecimal() || expected < Fix32.MinValue.ToDecimal())
+				var expectedF = xM * yM;
+				if (expectedF > Fix32.MaxValue.ToDecimal() || expectedF < Fix32.MinValue.ToDecimal())
 					continue; // Fast mult version doesn't saturate
 				sw.Start();
-				var actual = x.MulFast(y);
+				var actualF = x.MulFast(y);
 				sw.Stop();
-				var expextedM = expected.ToFix32().ToDouble();
-				var actualM = actual.ToDouble();
-				Assert.AreEqual(expextedM, actualM, (double) Fix32Ext.Precision, x.ToStringExt() + " * " + y.ToStringExt());
+				var expected = expectedF.ToFix32().ToDouble();
+				var actual = actualF.ToDouble();
+				Assert.AreEqual(expected, actual, (double) Fix32Ext.Precision, x.ToStringExt() + " * " + y.ToStringExt() + Delta(expected, actual, deltas));
 			}
 		}
-		Console.WriteLine("{0} total, {1} per multiplication", sw.Elapsed.TotalMilliseconds, sw.Elapsed.TotalMilliseconds / (m_testCases.Length * m_testCases.Length));
+		Console.WriteLine("{0} total, {1} per multiplication", sw.Elapsed.TotalMilliseconds, sw.Elapsed.TotalMilliseconds / (TestCases.Count * TestCases.Count));
+		DeltasStatistics(deltas);
 	}
 
 	[Test]
 	public void T017_Div() {
+		List<double> deltas = new List<double>();
 		var sw = new Stopwatch();
-		for (int i = 0; i < m_testCases.Length; ++i) {
-			for (int j = 0; j < m_testCases.Length; ++j) {
-				var x = (Fix32) m_testCases[i];
-				var y = (Fix32) m_testCases[j];
+		for (int i = 0; i < TestCases.Count; ++i) {
+			for (int j = 0; j < TestCases.Count; ++j) {
+				var x = (Fix32) TestCases[i];
+				var y = (Fix32) TestCases[j];
 				var xM = x.ToDecimal();
 				var yM = y.ToDecimal();
 
-				if (m_testCases[j] == 0) {
+				if (TestCases[j] == 0) {
 					Assert.AreEqual(x >= 0 ? Fix32.MaxValue : Fix32.MinValue, x.Div(y), x.ToStringExt() + " / " + y.ToStringExt());
 				}
 				else {
-					var expected = xM / yM;
-					expected =
-						expected > Fix32.MaxValue.ToDecimal()
+					var expectedF = xM / yM;
+					expectedF =
+						expectedF > Fix32.MaxValue.ToDecimal()
 							? Fix32.MaxValue.ToDecimal()
-							: expected < Fix32.MinValue.ToDecimal()
+							: expectedF < Fix32.MinValue.ToDecimal()
 									? Fix32.MinValue.ToDecimal()
-									: expected;
+									: expectedF;
 					sw.Start();
-					var actual = x.Div(y);
+					var actualF = x.Div(y);
 					sw.Stop();
-					var actualM = actual.ToDecimal();
+					var expected = (double) expectedF;
+					var actual = actualF.ToDouble();
 
-					Assert.AreEqual((double) expected, actual.ToDouble(), (double) Fix32Ext.Precision, x.ToStringExt() + " / " + y.ToStringExt());
+					Assert.AreEqual(expected, actual, (double) Fix32Ext.Precision, x.ToStringExt() + " / " + y.ToStringExt() + Delta(expected, actual, deltas));
 				}
 			}
 		}
-		Console.WriteLine("{0} total, {1} per division", sw.Elapsed.TotalMilliseconds, sw.Elapsed.TotalMilliseconds / (m_testCases.Length * m_testCases.Length));
+		Console.WriteLine("{0} total, {1} per division", sw.Elapsed.TotalMilliseconds, sw.Elapsed.TotalMilliseconds / (TestCases.Count * TestCases.Count));
+		DeltasStatistics(deltas);
 	}
 
 	[Test]
 	public void T0171_DivFast() {
+		List<double> deltas = new List<double>();
 		var sw = new Stopwatch();
-		for (int i = 0; i < m_testCases.Length; ++i) {
-			for (int j = 0; j < m_testCases.Length; ++j) {
-				var x = (Fix32) m_testCases[i];
-				var y = (Fix32) m_testCases[j];
+		for (int i = 0; i < TestCases.Count; ++i) {
+			for (int j = 0; j < TestCases.Count; ++j) {
+				var x = (Fix32) TestCases[i];
+				var y = (Fix32) TestCases[j];
 				var xM = x.ToDecimal();
 				var yM = y.ToDecimal();
 
-				if (m_testCases[j] == 0) {
+				if (TestCases[j] == 0) {
 					Assert.AreEqual(x >= 0 ? Fix32.MaxValue : Fix32.MinValue, x.DivFast(y), x.ToStringExt() + " / " + y.ToStringExt());
 				}
 				else {
-					var expected = xM / yM;
-					expected =
-						expected > Fix32.MaxValue.ToDecimal()
+					var expectedF = xM / yM;
+					expectedF =
+						expectedF > Fix32.MaxValue.ToDecimal()
 							? Fix32.MaxValue.ToDecimal()
-							: expected < Fix32.MinValue.ToDecimal()
+							: expectedF < Fix32.MinValue.ToDecimal()
 									? Fix32.MinValue.ToDecimal()
-									: expected;
+									: expectedF;
 					sw.Start();
-					var actual = x.DivFast(y);
+					var actualF = x.DivFast(y);
 					sw.Stop();
-					var actualM = actual.ToDecimal();
+					var expected = (double) expectedF;
+					var actual = actualF.ToDouble();
 
-					Assert.AreEqual((double) expected, actual.ToDouble(), (double) Fix32Ext.Precision, x.ToStringExt() + " / " + y.ToStringExt());
+					Assert.AreEqual(expected, actual, (double) Fix32Ext.Precision, x.ToStringExt() + " / " + y.ToStringExt() + Delta(expected, actual, deltas));
 				}
 			}
 		}
-		Console.WriteLine("{0} total, {1} per division", sw.Elapsed.TotalMilliseconds, sw.Elapsed.TotalMilliseconds / (m_testCases.Length * m_testCases.Length));
+		Console.WriteLine("{0} total, {1} per division", sw.Elapsed.TotalMilliseconds, sw.Elapsed.TotalMilliseconds / (TestCases.Count * TestCases.Count));
+		DeltasStatistics(deltas);
 	}
 
 	[Test]
 	public void T018_Log2() {
+		List<double> deltas = new List<double>();
 		double maxDelta = 3 * (double) Fix32Ext.Precision;
 
-		for (int j = 0; j < m_testCases.Length; ++j) {
-			var b = (Fix32) m_testCases[j];
+		for (int j = 0; j < TestCases.Count; ++j) {
+			var b = (Fix32) TestCases[j];
 
 			if (b <= Fix32.Zero) {
 				Assert.Throws<ArgumentOutOfRangeException>(() => b.Log2());
@@ -509,51 +525,57 @@ public class Fix32Tests {
 				var expected = Math.Log(b.ToDouble()) / Math.Log(2);
 				var actual = b.Log2().ToDouble();
 
-				Assert.AreEqual(expected, actual, maxDelta, b.ToStringExt());
+				Assert.AreEqual(expected, actual, maxDelta, b.ToStringExt() + Delta(expected, actual, deltas));
 			}
 		}
+		DeltasStatistics(deltas);
+	}
+
+	[Test]
+	public void T019_Ln() {
+		List<double> deltas = new List<double>();
+		double maxDelta = 8 * (double) Fix32Ext.Precision;
+
+		for (int j = 0; j < TestCases.Count; ++j) {
+			var b = (Fix32) TestCases[j];
+
+			if (b <= Fix32.Zero) {
+				Assert.Throws<ArgumentOutOfRangeException>(() => b.Ln());
+			}
+			else {
+				var expected = Math.Log(b.ToDouble());
+				var actual = b.Ln().ToDouble();
+
+				Assert.AreEqual(expected, actual, maxDelta, b.ToStringExt() + Delta(expected, actual, deltas));
+			}
+		}
+		DeltasStatistics(deltas);
+	}
+
+	[Test]
+	public void T020_Sqrt() {
+		List<double> deltas = new List<double>();
+		double maxDelta = 8 * (double) Fix32Ext.Precision;
+
+		for (int i = 0; i < TestCases.Count; ++i) {
+			var f = (Fix32) TestCases[i];
+			if (f.SignI() < 0) {
+				Assert.Throws<ArgumentOutOfRangeException>(() => f.Sqrt());
+			}
+			else {
+				var expected = Math.Sqrt(f.ToDouble());
+				var actual = f.Sqrt().ToDouble();
+				Assert.AreEqual(expected, actual, maxDelta, "sqrt(" + f + ")" + Delta(expected, actual, deltas));
+			}
+		}
+		DeltasStatistics(deltas);
 	}
 
 	/*
 	[Test]
-	public void Sqrt() {
-		for (int i = 0; i < m_testCases.Length; ++i) {
-			var f = Fix64.FromRaw(m_testCases[i]);
-			if (Fix64.Sign(f) < 0) {
-				Assert.Throws<ArgumentOutOfRangeException>(() => Fix64.Sqrt(f));
-			}
-			else {
-				var expected = Math.Sqrt((double) f);
-				var actual = (double) Fix64.Sqrt(f);
-				Assert.AreEqual(expected, actual, (double) Fix32Ext.Precision, "sqrt(" + f + ")");
-			}
-		}
-	}
-
-	[Test]
-	public void Ln() {
-		double maxDelta = 4 * (double) Fix32Ext.Precision;
-
-		for (int j = 0; j < m_testCases.Length; ++j) {
-			var b = Fix64.FromRaw(m_testCases[j]);
-
-			if (b <= Fix64.Zero) {
-				Assert.Throws<ArgumentOutOfRangeException>(() => Fix64.Ln(b));
-			}
-			else {
-				var expected = Math.Log((double) b);
-				var actual = (double) Fix64.Ln(b);
-				var delta = Math.Abs(expected - actual);
-
-				Assert.AreEqual(expected, actual, maxDelta, string.Format("Ln({0}) = expected {1} but got {2}", b, expected, actual));
-			}
-		}
-	}
-
-	[Test]
 	public void Pow2() {
-		for (int i = 0; i < m_testCases.Length; ++i) {
-			var e = Fix64.FromRaw(m_testCases[i]);
+		for (int i = 0; i < TestCases.Count; ++i) {
+			var e = Fix64.FromRaw(TestCases[i]);
 
 			var expected = Math.Min(Math.Pow(2, (double) e), (double) Fix64.MaxValue);
 			var actual = (double) Fix64.Pow2(e);
@@ -569,11 +591,11 @@ public class Fix32Tests {
 
 	[Test]
 	public void Pow() {
-		for (int i = 0; i < m_testCases.Length; ++i) {
-			var b = Fix64.FromRaw(m_testCases[i]);
+		for (int i = 0; i < TestCases.Count; ++i) {
+			var b = Fix64.FromRaw(TestCases[i]);
 
-			for (int j = 0; j < m_testCases.Length; ++j) {
-				var e = Fix64.FromRaw(m_testCases[j]);
+			for (int j = 0; j < TestCases.Count; ++j) {
+				var e = Fix64.FromRaw(TestCases[j]);
 
 				if (b == Fix64.Zero && e < Fix64.Zero) {
 					Assert.Throws<DivideByZeroException>(() => Fix64.Pow(b, e));
@@ -609,8 +631,8 @@ public class Fix32Tests {
 	[Test]
 	public void Modulus() {
 		var deltas = new List<decimal>();
-		foreach (var operand1 in m_testCases) {
-			foreach (var operand2 in m_testCases) {
+		foreach (var operand1 in TestCases) {
+			foreach (var operand2 in TestCases) {
 				var f1 = Fix64.FromRaw(operand1);
 				var f2 = Fix64.FromRaw(operand2);
 
@@ -687,7 +709,7 @@ public class Fix32Tests {
 		}
 
 		var deltas = new List<decimal>();
-		foreach (var val in m_testCases) {
+		foreach (var val in TestCases) {
 			var f = Fix64.FromRaw(val);
 			var actualF = Fix64.Sin(f);
 			var expected = Math.Sin((double) f);
@@ -705,7 +727,7 @@ public class Fix32Tests {
 			Assert.True(delta <= 50000 * Fix64.Precision, string.Format("Sin({0}): expected {1} but got {2}", angle, expected, actualF));
 		}
 
-		foreach (var val in m_testCases) {
+		foreach (var val in TestCases) {
 			var f = Fix64.FromRaw(val);
 			var actualF = Fix64.FastSin(f);
 			var expected = (decimal) Math.Sin((double) f);
@@ -732,8 +754,8 @@ public class Fix32Tests {
 			Assert.AreEqual(expected, actual, 12 * (double) Fix32Ext.Precision, string.Format("Precision: Acos({0}): expected {1} but got {2}", xf, expected, actual));
 		}
 
-		for (int i = 0; i < m_testCases.Length; ++i) {
-			var b = Fix64.FromRaw(m_testCases[i]);
+		for (int i = 0; i < TestCases.Count; ++i) {
+			var b = Fix64.FromRaw(TestCases[i]);
 
 			if (b < -Fix64.One || b > Fix64.One) {
 				Assert.Throws<ArgumentOutOfRangeException>(() => Fix64.Acos(b));
@@ -773,7 +795,7 @@ public class Fix32Tests {
 			Assert.LessOrEqual(delta, 3 * Fix64.Precision, string.Format("Cos({0}): expected {1} but got {2}", angle, expected, actualF));
 		}
 
-		foreach (var val in m_testCases) {
+		foreach (var val in TestCases) {
 			var f = Fix64.FromRaw(val);
 			var actualF = Fix64.Cos(f);
 			var expected = (decimal) Math.Cos((double) f);
@@ -792,7 +814,7 @@ public class Fix32Tests {
 			Assert.True(delta <= 50000 * Fix64.Precision, string.Format("Cos({0}): expected {1} but got {2}", angle, expected, actualF));
 		}
 
-		foreach (var val in m_testCases) {
+		foreach (var val in TestCases) {
 			var f = Fix64.FromRaw(val);
 			var actualF = Fix64.FastCos(f);
 			var expected = (decimal) Math.Cos((double) f);
@@ -820,7 +842,7 @@ public class Fix32Tests {
 			//TODO figure out a real way to test this function
 		}
 
-		//foreach (var val in m_testCases) {
+		//foreach (var val in TestCases) {
 		//    var f = (Fix64)val;
 		//    var actualF = Fix64.Tan(f);
 		//    var expected = (decimal)Math.Tan((double)f);
@@ -846,7 +868,7 @@ public class Fix32Tests {
 		}
 
 		// Scalability and edge cases
-		foreach (var x in m_testCases) {
+		foreach (var x in TestCases) {
 			var xf = Fix64.FromRaw(x);
 			var actual = (decimal) Fix64.Atan(xf);
 			var expected = (decimal) Math.Atan((double) xf);
@@ -911,8 +933,8 @@ public class Fix32Tests {
 		}
 
 		// Scalability and edge cases
-		foreach (var y in m_testCases) {
-			foreach (var x in m_testCases) {
+		foreach (var y in TestCases) {
+			foreach (var x in TestCases) {
 				var yf = Fix64.FromRaw(y);
 				var xf = Fix64.FromRaw(x);
 				var actual = (double) Fix64.Atan2(yf, xf);
@@ -935,9 +957,9 @@ public class Fix32Tests {
 		var swf = new Stopwatch();
 		var swd = new Stopwatch();
 
-		foreach (var y in m_testCases)
+		foreach (var y in TestCases)
 		{
-			foreach (var x in m_testCases)
+			foreach (var x in TestCases)
 			{
 				for (int k = 0; k < 1000; ++k)
 				{
@@ -972,5 +994,17 @@ public class Fix32Tests {
 
 	static double Saturate(double v) {
 		return Math.Max(Fix32.MinValue.ToDouble(), Math.Min(Fix32.MaxValue.ToDouble(), v));
+	}
+
+	static string Delta(double a, double b, List<double> deltas) {
+		double delta = Math.Abs(a - b);
+		if (deltas != null) deltas.Add(delta);
+		return " [Delta: " + delta + "]";
+	}
+
+	static void DeltasStatistics(List<double> deltas) {
+		Console.WriteLine("Delta statistics");
+		Console.WriteLine("Max error: {0} ({1} times precision)", deltas.Max(), deltas.Max() / (double) Fix32Ext.Precision);
+		Console.WriteLine("Average precision: {0} ({1} times precision)", deltas.Average(), deltas.Average() / (double) Fix32Ext.Precision);
 	}
 }
