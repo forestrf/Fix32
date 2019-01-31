@@ -404,7 +404,7 @@ public static partial class Fix32Ext {
 		//     Processing Mag., pp. 124,140, Sep. 2010.)
 
 		//https://github.com/dmoulding/log2fix/blob/master/log2fix.c
-		
+
 		const int PRECISION = FRACTIONAL_BITS;
 
 		int b = 1 << (PRECISION - 1);
@@ -466,37 +466,38 @@ public static partial class Fix32Ext {
 		}
 
 		// https://stackoverflow.com/questions/1100090/looking-for-an-efficient-integer-square-root-algorithm-for-arm-thumb2
-		
-		int a = 0; // accumulator
-		int r = 0; // remainder
 
+		const int SHIFT = NUM_BITS;
 		// Manually calculated constants (somehow) for precision Q18.14
-		const int SHIFT = 32;
 		const int ITERATIONS = (((SHIFT - 16) / 4) * 2) + 16; // 24
 
 		int shift = SHIFT - 2;
 
-		int bottomHalf = 0;
+		// [1] First iteration
+		int bottomHalf = 0; // 0x3 & ((int) x >> SHIFT); equals 0
 
-		for (int i = 0; i < ITERATIONS; i++) {
+		int a = 0; // accumulator
+		int r = 0; // remainder
+		int i = 0;
+		while (i++ < ITERATIONS) {
 			r = (r << 2) | bottomHalf;
 			a <<= 1;
-			int e = (a << 1) + 1; // trial product
+			int e = (a << 1) | 1; // trial product
 			if (r >= e) {
 				r -= e;
-				a++;
+				a |= 1;
 			}
+			// [1] Subsequent iterations
 			bottomHalf = 0x3 & ((int) x >> shift);
 			shift -= 2;
 		}
 
-		return (Fix32) (int) a;
-		
+		return (Fix32) a;
+
 
 
 
 		/*
-		
 		uint r = (uint) x;
 		uint b = 0x40000000;
 		uint q = 0;
@@ -530,61 +531,6 @@ public static partial class Fix32Ext {
 			g1 = (g1 + (xx / g1)) >> 1;
 		}
 		return (Fix32) (g0);
-		*/
-		/*
-		var xl = (int) x;
-
-		var num = (uint) xl;
-		var result = 0U;
-
-		// second-to-top bit
-		var bit = 1U << (NUM_BITS - 2);
-
-		while (bit > num) {
-			bit >>= 2;
-		}
-
-		// The main part is executed twice, in order to avoid
-		// using 128 bit values in computations.
-		for (var i = 0; i < 2; ++i) {
-			// First we get the top 48 bits of the answer.
-			while (bit != 0) {
-				if (num >= result + bit) {
-					num -= result + bit;
-					result = (result >> 1) + bit;
-				}
-				else {
-					result = result >> 1;
-				}
-				bit >>= 2;
-			}
-
-			if (i == 0) {
-				// Then process it again to get the lowest 16 bits.
-				if (num > (1U << (NUM_BITS / 2)) - 1) {
-					// The remainder 'num' is too large to be shifted left
-					// by 32, so we have to add 1 to result manually and
-					// adjust 'num' accordingly.
-					// num = a - (result + 0.5)^2
-					//       = num + result^2 - (result + 0.5)^2
-					//       = num - result - 0.5
-					num -= result;
-					num = (num << (NUM_BITS / 2)) - (1U << NUM_BITS_MINUS_ONE);
-					result = (result << (NUM_BITS / 2)) + (1U << NUM_BITS_MINUS_ONE);
-				}
-				else {
-					num <<= (NUM_BITS / 2);
-					result <<= (NUM_BITS / 2);
-				}
-
-				bit = 1U << (NUM_BITS / 2 - 2);
-			}
-		}
-		// Finally, if next bit would have been 1, round the result upwards.
-		if (num > result) {
-			++result;
-		}
-		return (Fix32) (int) result;
 		*/
 	}
 
