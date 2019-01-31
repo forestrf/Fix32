@@ -10,18 +10,18 @@ using System.Runtime.CompilerServices;
 public enum Fix32 : int {
 	MaxValue = Fix32Ext.MAX_VALUE,
 	MinValue = Fix32Ext.MIN_VALUE,
-	MinusOne = -Fix32Ext.ONE,
-	One = Fix32Ext.ONE,
-	Two = Fix32Ext.ONE * 2,
-	Three = Fix32Ext.ONE * 3,
-	Zero = 0,
 
-	/// <summary>
-	/// The value of Pi
-	/// </summary>
+	Three = One * 3,
+	Two = One * 2,
+	One = Fix32Ext.ONE,
+	Zero = 0,
+	MinusOne = -One,
+	MinusTwo = -One * 2,
+	MinusThree = -One * 3,
+
 	Pi = Fix32Ext.PI,
-	PiOver2 =  Fix32Ext.PI_OVER_2,
-	PiOver4 =  Fix32Ext.PI_OVER_4,
+	PiOver2 = Fix32Ext.PI_OVER_2,
+	PiOver4 = Fix32Ext.PI_OVER_4,
 	PiTimes2 = Fix32Ext.PI_TIMES_2,
 	PiInv = Fix32Ext.PI_INV,
 	PiOver2Inv = Fix32Ext.PI_OVER_2_INV,
@@ -37,8 +37,8 @@ public enum Fix32 : int {
 /// </summary>
 public static partial class Fix32Ext {
 
-    // Precision of this type is 2^-14, that is 6.103515625E-5
-    public static readonly decimal Precision = ((Fix32) 1).ToDecimal();
+	// Precision of this type is 2^-14, that is 6.103515625E-5
+	public static readonly decimal Precision = ((Fix32) 1).ToDecimal();
 
 	internal const int MAX_VALUE = int.MaxValue;
 	internal const int MIN_VALUE = int.MinValue;
@@ -83,7 +83,7 @@ public static partial class Fix32Ext {
 	internal const int EPOW4 = (int) (D_EPOW4 < 0 ? D_EPOW4 - 0.5m : D_EPOW4 + 0.5m);
 	internal const int LN2 = (int) (D_LN2 < 0 ? D_LN2 - 0.5m : D_LN2 + 0.5m);
 
-		
+
 
 	/// <summary>
 	/// Adds x and y. Performs saturating addition, i.e. in case of overflow, 
@@ -141,49 +141,49 @@ public static partial class Fix32Ext {
 	/// Returns 1 if the value is positive, 0 if is 0, and -1 if it is negative.
 	/// </summary>
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static int SignI(this Fix32 x) {
+	public static int SignI(this Fix32 x) {
 		//https://stackoverflow.com/questions/14579920/fast-sign-of-integer-in-c/14612418#14612418
 		return ((int) x >> NUM_BITS_MINUS_ONE) | (int) (((uint) -(int) x) >> NUM_BITS_MINUS_ONE);
-    }
+	}
 
 	/// <summary>
 	/// Returns a number indicating the sign of a Fix64 number.
 	/// Returns 1 if the value is positive, 0 if is 0, and -1 if it is negative.
 	/// </summary>
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Fix32 Sign(this Fix32 x) {
+	public static Fix32 Sign(this Fix32 x) {
 		const int RS = NUM_BITS_MINUS_ONE - FRACTIONAL_PLACES;
 		return (Fix32) ((((int) x >> RS) | (int) (((uint) -(int) x) >> RS)) & INTEGER_MASK);
-    }
+	}
 
 
-    /// <summary>
-    /// Returns the absolute value of a Fix64 number.
-    /// Note: Abs(Fix64.MinValue) == Fix64.MaxValue.
-    /// </summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Fix32 Abs(this Fix32 x) {
+	/// <summary>
+	/// Returns the absolute value of a Fix64 number.
+	/// Note: Abs(Fix64.MinValue) == Fix64.MaxValue.
+	/// </summary>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static Fix32 Abs(this Fix32 x) {
 #if USE_DOUBLES
 		return Math.Abs(x.ToDouble()).ToFix32();
 #endif
 		if ((int) x == MIN_VALUE) {
-            return Fix32.MaxValue;
-        }
+			return Fix32.MaxValue;
+		}
 
-        // branchless implementation, see http://www.strchr.com/optimized_abs_function
-        var mask = (int) x >> NUM_BITS_MINUS_ONE;
-        return (Fix32) (((int) x + mask) ^ mask);
-    }
-
-    /// <summary>
-    /// Returns the absolute value of a Fix64 number.
-    /// FastAbs(Fix64.MinValue) is undefined.
-    /// </summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Fix32 AbsFast(this Fix32 x) {
+		// branchless implementation, see http://www.strchr.com/optimized_abs_function
 		var mask = (int) x >> NUM_BITS_MINUS_ONE;
-        return (Fix32) (((int) x + mask) ^ mask);
-    }
+		return (Fix32) (((int) x + mask) ^ mask);
+	}
+
+	/// <summary>
+	/// Returns the absolute value of a Fix64 number.
+	/// FastAbs(Fix64.MinValue) is undefined.
+	/// </summary>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static Fix32 AbsFast(this Fix32 x) {
+		var mask = (int) x >> NUM_BITS_MINUS_ONE;
+		return (Fix32) (((int) x + mask) ^ mask);
+	}
 
 	/// <summary>
 	/// Returns the largest integer less than or equal to the specified number.
@@ -228,7 +228,7 @@ public static partial class Fix32Ext {
 		// if number is halfway between two values, round to the nearest even number
 		// this is the method used by System.Math.Round().
 		return ((int) integralPart & ONE) == 0 ?
-			integralPart : 
+			integralPart :
 			integralPart.Add(Fix32.One);
 	}
 
@@ -244,23 +244,82 @@ public static partial class Fix32Ext {
 		return (Fix32) (((int) x + (ONE / 2 - 1) + odd) & INTEGER_MASK);
 	}
 
+	/// <summary>
+	/// Multiply. Saturates when overflows
+	/// </summary>
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public static Fix32 Mul(this Fix32 x, Fix32 y) {
 #if USE_DOUBLES
 		return Math.Round(x.ToDouble() * y.ToDouble()).ToFix32();
 #endif
-		int mult = (int) (((long) x * (long) y) >> FRACTIONAL_PLACES);
+		long multLong = ((long) x * (long) y) >> FRACTIONAL_PLACES;
 
 		int finalSign = (int) x ^ (int) y;
-			
-		return (Fix32) (((finalSign ^ mult) & SIGN_MASK) != 0 ?
+
+		return (Fix32) (((finalSign ^ multLong) & SIGN_MASK) != 0 && multLong != 0 ?
 			(int) ((((uint) finalSign >> NUM_BITS_MINUS_ONE) - 1U) ^ (1U << NUM_BITS_MINUS_ONE)) :
-			mult);
+			(int) multLong);
 	}
-		
+
+	/// <summary>
+	/// Multiply. No saturation (overflows)
+	/// </summary>
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public static Fix32 MulFast(this Fix32 x, Fix32 y) {
 		return (Fix32) (((long) x * (long) y) >> FRACTIONAL_PLACES);
+	}
+
+	/// <summary>
+	/// Divide. Saturates on overflow
+	/// </summary>
+	public static Fix32 Div(this Fix32 x, Fix32 y) {
+#if USE_DOUBLES
+		return (x.ToDouble() / y.ToDouble()).ToFix32();
+#endif
+		long xl = (int) x;
+
+		if ((int) y == 0) {
+			return (Fix32) (unchecked((int) (((((uint) xl) >> NUM_BITS_MINUS_ONE) - 1U) ^ (1U << NUM_BITS_MINUS_ONE))));
+			return xl >= 0 ? Fix32.MaxValue : Fix32.MinValue; // Branched version of the previous code, for clarity. Slower
+		}
+
+		long a = xl << FRACTIONAL_PLACES;
+		long b = (int) y;
+		long r = a / b;
+		if (r > MAX_VALUE) return Fix32.MaxValue;
+		if (r < MIN_VALUE) return Fix32.MinValue;
+		return (Fix32) (int) r;
+	}
+
+	/// <summary>
+	/// Divide. Copied from DOOM. Wrong?
+	/// </summary>
+	public static Fix32 DivFast(this Fix32 x, Fix32 y) {
+		//x = Fix32.MinValue;
+		//y = Fix32.MinusOne;
+		int xAbs = (int) x.Abs();
+		int yAbs = (int) y.Abs();
+		if ((xAbs >> 17/*((NUM_BITS - FRACTIONAL_PLACES) - 2)*/) >= yAbs)
+			return ((int) x ^ (int) y) < 0 ? Fix32.MinValue : Fix32.MaxValue;
+		return x.DivFastOverflow(y);
+	}
+
+	/// <summary>
+	/// Divide. Copied from DOOM. Wrong?
+	/// </summary>
+	public static Fix32 DivFastOverflow(this Fix32 x, Fix32 y) {
+#if true
+		long c = (((long) x) << FRACTIONAL_PLACES) / (long) y;
+		return (Fix32) c;
+#endif
+		/*
+		// From DOOM
+		double c = ((double) x) / ((double) y) * (int) Fix32.One;
+
+		if (c >= 2147483648.0 || c < -2147483648.0)
+			I_Error("FixedDiv: divide by zero");
+		return c.ToFix32();
+		*/
 	}
 
 	/// <summary>
@@ -274,43 +333,41 @@ public static partial class Fix32Ext {
 		return Math.Log(x.ToDouble(), 2).ToFix32();
 #endif
 		if ((int) x <= 0)
-            throw new ArgumentOutOfRangeException("Non-positive value passed to Ln", "x");
+			throw new ArgumentOutOfRangeException("Non-positive value passed to Ln", "x");
 
-        // This implementation is based on Clay. S. Turner's fast binary logarithm
-        // algorithm (C. S. Turner,  "A Fast Binary Logarithm Algorithm", IEEE Signal
-        //     Processing Mag., pp. 124,140, Sep. 2010.)
+		// This implementation is based on Clay. S. Turner's fast binary logarithm
+		// algorithm (C. S. Turner,  "A Fast Binary Logarithm Algorithm", IEEE Signal
+		//     Processing Mag., pp. 124,140, Sep. 2010.)
+		
+		//https://github.com/dmoulding/log2fix/blob/master/log2fix.c
 
-        uint b = 1U << (FRACTIONAL_PLACES - 1);
-		uint y = 0;
+		int b = 1 << (FRACTIONAL_PLACES - 1);
+		int y = 0;
 
-        var rawX = (int) x;
-        while (rawX < ONE)
-        {
-            rawX <<= 1;
-            y -= ONE;
-        }
+		var rawX = (int) x;
+		while (rawX < ONE) {
+			rawX <<= 1;
+			y -= ONE;
+		}
 
-        while (rawX >= (ONE << 1))
-        {
-            rawX >>= 1;
-            y += ONE;
-        }
+		while (rawX >= (ONE * 2)) {
+			rawX >>= 1;
+			y += ONE;
+		}
 
-        Fix32 z = (Fix32) rawX;
+		ulong z = (ulong) rawX;
 
-        for (int i = 0; i < FRACTIONAL_PLACES; i++)
-        {
-            z = (Fix32) ((int) z * (int) z);
-            if ((int) z >= (ONE << 1))
-            {
-                z = (Fix32) ((int) z >> 1);
-                y += b;
-            }
-            b >>= 1;
-        }
+		for (int i = 0; i < FRACTIONAL_PLACES; i++) {
+			z = z * z >> FRACTIONAL_PLACES;
+			if (z >= ONE * 2) {
+				z >>= 1;
+				y += b;
+			}
+			b >>= 1;
+		}
 
-        return (Fix32) ((int) y);
-    }
+		return (Fix32) (int) y;
+	}
 
 	/// <summary>
 	/// Returns the natural logarithm of a specified number.
@@ -324,52 +381,51 @@ public static partial class Fix32Ext {
 		return Math.Log(x.ToDouble()).ToFix32();
 #endif
 		return Log2(x).Mul(Fix32.Ln2);
-    }
+	}
 
-    /// <summary>
-    /// Returns 2 raised to the specified power.
-    /// </summary>
-    public static Fix32 Pow2(this Fix32 xx) {
+	/// <summary>
+	/// Returns 2 raised to the specified power.
+	/// </summary>
+	public static Fix32 Pow2(this Fix32 xx) {
 #if USE_DOUBLES
 		return Math.Pow(2, x.ToDouble()).ToFix32();
 #endif
 		Fix32 x = xx;
 		if ((int) x == 0) return Fix32.One;
 
-        // Avoid negative arguments by exploiting that exp(-x) = 1/exp(x).
-        bool neg = (int) x < 0;
-        if (neg) x = x.Neg();
+		// Avoid negative arguments by exploiting that exp(-x) = 1/exp(x).
+		bool neg = (int) x < 0;
+		if (neg) x = x.Neg();
 
-        if ((int) x == (int) Fix32.One)
-            return neg ? Fix32.One.Div(Fix32.Two) : Fix32.Two; // Can be cached
+		if ((int) x == (int) Fix32.One)
+			return neg ? (Fix32) Fix32.One.Div(Fix32.Two) : (Fix32) Fix32.Two; // Can be cached
 		if ((int) x >= (int) Fix32.Log2Max) return neg ? Fix32.One.Div(Fix32.MaxValue) : Fix32.MaxValue; // Can be cached
-        if ((int) x <= (int) Fix32.Log2Min) return neg ? Fix32.MaxValue : Fix32.Zero;
+		if ((int) x <= (int) Fix32.Log2Min) return neg ? Fix32.MaxValue : Fix32.Zero;
 
-        /* The algorithm is based on the power series for exp(x):
+		/* The algorithm is based on the power series for exp(x):
             * http://en.wikipedia.org/wiki/Exponential_function#Formal_definition
             * 
             * From term n, we get term n+1 by multiplying with x/n.
             * When the sum term drops to zero, we can stop summing.
             */
-        int integerPart = (int)((Fix32) x).Floor();
-        // Take fractional part of exponent
-        x = (Fix32) ((uint) x & FRACTIONAL_MASK);
+		int integerPart = (int) ((Fix32) x).Floor();
+		// Take fractional part of exponent
+		x = (Fix32) ((uint) x & FRACTIONAL_MASK);
 
 		Fix32 result = Fix32.One;
 		Fix32 term = Fix32.One;
-        int i = 1;
-        while (term != 0)
-        {
-            term = x.Mul(term).Mul(Fix32.Ln2.Div(i.ToFix32()));
-            result = result.Add(term);
-            i++;
-        }
+		int i = 1;
+		while ((int) term != 0) {
+			term = x.Mul(term).Mul(Fix32.Ln2.Div(i.ToFix32()));
+			result = result.Add(term);
+			i++;
+		}
 
-        result = (Fix32) ((int) result << integerPart);
-        if (neg) result = Fix32.One.Div(result);
+		result = (Fix32) ((int) result << integerPart);
+		if (neg) result = Fix32.One.Div(result);
 
-        return result;
-    }
+		return result;
+	}
 
 	/// <summary>
 	/// Returns a specified number raised to the specified power.
@@ -384,76 +440,56 @@ public static partial class Fix32Ext {
 #if USE_DOUBLES
 		return Math.Pow(b.ToDouble(), exp.ToDouble()).ToFix32();
 #endif
-		if (b == Fix32.One)
-            return Fix32.One;
-        if ((int) exp == 0)
-            return Fix32.One;
-        if ((int) b == 0) {
-            if ((int) exp < 0) {
-                throw new DivideByZeroException();
-            }
-            return Fix32.Zero;
-        }
-            
-        Fix32 log2 = b.Log2();
-        return exp.Mul(log2).Pow2();
-    }
+		if ((int) b == (int) Fix32.One)
+			return Fix32.One;
+		if ((int) exp == 0)
+			return Fix32.One;
+		if ((int) b == 0) {
+			if ((int) exp < 0) {
+				throw new DivideByZeroException();
+			}
+			return Fix32.Zero;
+		}
 
-    /// <summary>
-    /// Returns the arccos of of the specified number, calculated using Atan and Sqrt
-    /// </summary>
-    public static Fix32 Acos(this Fix32 x) {
+		Fix32 log2 = b.Log2();
+		return exp.Mul(log2).Pow2();
+	}
+
+	/// <summary>
+	/// Returns the arccos of of the specified number, calculated using Atan and Sqrt
+	/// </summary>
+	public static Fix32 Acos(this Fix32 x) {
 #if USE_DOUBLES
         return (Fix64) Math.Acos((double) x);
 #endif
-        if ((int) x < -(int) Fix32.One || (int) x > (int) Fix32.One)
-            throw new ArgumentOutOfRangeException(nameof(x));
+		if ((int) x < -(int) Fix32.One || (int) x > (int) Fix32.One)
+			throw new ArgumentOutOfRangeException(nameof(x));
 
-        if ((int) x == 0)
-            return Fix32.PiOver2;
+		if ((int) x == 0)
+			return Fix32.PiOver2;
 
-        var result = (Fix32.One.Sub(x.Mul(x))).Sqrt().Div(x).Atan();
-        return (int) x < 0 ? result.Add(Fix32.Pi) : result;
-    }
+		var result = (Fix32.One.Sub(x.Mul(x))).Sqrt().Div(x).Atan();
+		return (int) x < 0 ? result.Add(Fix32.Pi) : result;
+	}
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    static int CountLeadingZeroes(ulong x) {
-        int result = 0;
-        while ((x & 0xF000000000000000) == 0) { result += 4; x <<= 4; }
-        while ((x & 0x8000000000000000) == 0) { result += 1; x <<= 1; }
-        return result;
-    }
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	static int CountLeadingZeroes(ulong x) {
+		int result = 0;
+		while ((x & 0xF000000000000000) == 0) { result += 4; x <<= 4; }
+		while ((x & 0x8000000000000000) == 0) { result += 1; x <<= 1; }
+		return result;
+	}
 
-    public static Fix32 Div(this Fix32 x, Fix32 y) {
-#if USE_DOUBLES
-		return (x.ToDouble() / y.ToDouble()).ToFix32();
-#endif
-		long xl = (int) x;
-        long yl = (int) y;
-
-        if (yl == 0) {
-            return (Fix32) (unchecked((int) (((((uint) xl) >> NUM_BITS_MINUS_ONE) - 1U) ^ (1U << NUM_BITS_MINUS_ONE))));
-            return xl >= 0 ? Fix32.MaxValue : Fix32.MinValue; // Branched version of the previous code, for clarity. Slower
-        }
-
-		long a = xl << FRACTIONAL_PLACES;
-		long b = yl;
-		long r = a / b;
-		if (r > MAX_VALUE) return Fix32.MaxValue;
-		if (r < MIN_VALUE) return Fix32.MinValue;
-		return (Fix32) ((int) r);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Fix32 Mod(this Fix32 x, Fix32 y) {
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static Fix32 Mod(this Fix32 x, Fix32 y) {
 #if USE_DOUBLES
 		return (x.ToDouble() % y.ToDouble()).ToFix32();
 #endif
 		return (Fix32) (
-            (int) x == MIN_VALUE & (int) y == -1 ?
-            0 :
+			(int) x == MIN_VALUE & (int) y == -1 ?
+			0 :
 			(int) x % (int) y);
-    }
+	}
 
 	/// <summary>
 	/// Performs modulo as fast as possible; throws if x == MinValue and y == -1.
@@ -461,333 +497,326 @@ public static partial class Fix32Ext {
 	/// </summary>
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public static Fix32 ModFast(this Fix32 x, Fix32 y) {
-        return (Fix32) ((int) x % (int) y);
-    }
+		return (Fix32) ((int) x % (int) y);
+	}
 
 	/// <summary>
 	/// Negate
 	/// </summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Fix32 Neg(this Fix32 x) {
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static Fix32 Neg(this Fix32 x) {
 #if USE_DOUBLES
 		return (-x.ToDouble()).ToFix32();
 #endif
 		//return new Fix64(-x.RawValue);
 		return (Fix32) ((int) x == MIN_VALUE ? MAX_VALUE : -(int) x);
-    }
+	}
 
-    /// <summary>
-    /// Returns the square root of a specified number.
-    /// </summary>
-    /// <exception cref="ArgumentOutOfRangeException">
-    /// The argument was negative.
-    /// </exception>
-    public static Fix32 Sqrt(this Fix32 x) {
+	/// <summary>
+	/// Returns the square root of a specified number.
+	/// </summary>
+	/// <exception cref="ArgumentOutOfRangeException">
+	/// The argument was negative.
+	/// </exception>
+	public static Fix32 Sqrt(this Fix32 x) {
 #if USE_DOUBLES
 		return Math.Sqrt(x.ToDouble()).ToFix32();
 #endif
 		var xl = (int) x;
-        if (xl < 0) {
-            // We cannot represent infinities like Single and Double, and Sqrt is
-            // mathematically undefined for x < 0. So we just throw an exception.
-            throw new ArgumentOutOfRangeException("Negative value passed to Sqrt", "x");
-        }
-			
-        var num = (uint)xl;
-        var result = 0U;
+		if (xl < 0) {
+			// We cannot represent infinities like Single and Double, and Sqrt is
+			// mathematically undefined for x < 0. So we just throw an exception.
+			throw new ArgumentOutOfRangeException("Negative value passed to Sqrt", "x");
+		}
 
-        // second-to-top bit
-        var bit = 1U << (NUM_BITS - 2);
+		var num = (uint) xl;
+		var result = 0U;
 
-        while (bit > num) {
-            bit >>= 2;
-        }
+		// second-to-top bit
+		var bit = 1U << (NUM_BITS - 2);
 
-        // The main part is executed twice, in order to avoid
-        // using 128 bit values in computations.
-        for (var i = 0; i < 2; ++i) {
-            // First we get the top 48 bits of the answer.
-            while (bit != 0) {
-                if (num >= result + bit) {
-                    num -= result + bit;
-                    result = (result >> 1) + bit;
-                }
-                else {
-                    result = result >> 1;
-                }
-                bit >>= 2;
-            }
+		while (bit > num) {
+			bit >>= 2;
+		}
 
-            if (i == 0) {
-                // Then process it again to get the lowest 16 bits.
-                if (num > (1U << (NUM_BITS / 2)) - 1) {
-                    // The remainder 'num' is too large to be shifted left
-                    // by 32, so we have to add 1 to result manually and
-                    // adjust 'num' accordingly.
-                    // num = a - (result + 0.5)^2
-                    //       = num + result^2 - (result + 0.5)^2
-                    //       = num - result - 0.5
-                    num -= result;
-                    num = (num << (NUM_BITS / 2)) - (1U << NUM_BITS_MINUS_ONE);
-                    result = (result << (NUM_BITS / 2)) + (1U << NUM_BITS_MINUS_ONE);
-                }
-                else {
-                    num <<= (NUM_BITS / 2);
-                    result <<= (NUM_BITS / 2);
-                }
+		// The main part is executed twice, in order to avoid
+		// using 128 bit values in computations.
+		for (var i = 0; i < 2; ++i) {
+			// First we get the top 48 bits of the answer.
+			while (bit != 0) {
+				if (num >= result + bit) {
+					num -= result + bit;
+					result = (result >> 1) + bit;
+				}
+				else {
+					result = result >> 1;
+				}
+				bit >>= 2;
+			}
 
-                bit = 1U << (NUM_BITS / 2 - 2);
-            }
-        }
-        // Finally, if next bit would have been 1, round the result upwards.
-        if (num > result) {
-            ++result;
-        }
-        return (Fix32) (int) result;
-    }
+			if (i == 0) {
+				// Then process it again to get the lowest 16 bits.
+				if (num > (1U << (NUM_BITS / 2)) - 1) {
+					// The remainder 'num' is too large to be shifted left
+					// by 32, so we have to add 1 to result manually and
+					// adjust 'num' accordingly.
+					// num = a - (result + 0.5)^2
+					//       = num + result^2 - (result + 0.5)^2
+					//       = num - result - 0.5
+					num -= result;
+					num = (num << (NUM_BITS / 2)) - (1U << NUM_BITS_MINUS_ONE);
+					result = (result << (NUM_BITS / 2)) + (1U << NUM_BITS_MINUS_ONE);
+				}
+				else {
+					num <<= (NUM_BITS / 2);
+					result <<= (NUM_BITS / 2);
+				}
 
-    /// <summary>
-    /// Returns the Sine of x.
-    /// The relative error is less than 1E-10 for x in [-2PI, 2PI], and less than 1E-7 in the worst case.
-    /// </summary>
-    public static Fix32 Sin(this Fix32 x) {
+				bit = 1U << (NUM_BITS / 2 - 2);
+			}
+		}
+		// Finally, if next bit would have been 1, round the result upwards.
+		if (num > result) {
+			++result;
+		}
+		return (Fix32) (int) result;
+	}
+
+	/// <summary>
+	/// Returns the Sine of x.
+	/// The relative error is less than 1E-10 for x in [-2PI, 2PI], and less than 1E-7 in the worst case.
+	/// </summary>
+	public static Fix32 Sin(this Fix32 x) {
 #if USE_DOUBLES
         return (Fix64) Math.Sin((double) x);
 #endif
 		var clampedRaw = ClampSinValue((int) x, out var flipHorizontal, out var flipVertical);
-        var clamped = (Fix32) ((int) clampedRaw);
+		var clamped = (Fix32) ((int) clampedRaw);
 
-        // Find the two closest values in the LUT and perform linear interpolation
-        // This is what kills the performance of this function on x86 - x64 is fine though
-        Fix32 rawIndex = clamped.Mul(LutInterval);
-        Fix32 roundedIndex = rawIndex.Round();
-        Fix32 indexError = rawIndex.Sub(roundedIndex);
+		// Find the two closest values in the LUT and perform linear interpolation
+		// This is what kills the performance of this function on x86 - x64 is fine though
+		Fix32 rawIndex = clamped.Mul(LutInterval);
+		Fix32 roundedIndex = rawIndex.Round();
+		Fix32 indexError = rawIndex.Sub(roundedIndex);
 
-        var nearestValue = (Fix32) ((int) SinLut[flipHorizontal ?
-            SinLut.Length - 1 - (int)roundedIndex :
-            (int)roundedIndex]);
-        var secondNearestValue = (Fix32) ((int) SinLut[flipHorizontal ?
-            SinLut.Length - 1 - (int)roundedIndex - SignI(indexError) :
-            (int)roundedIndex + SignI(indexError)]);
+		var nearestValue = (Fix32) ((int) SinLut[flipHorizontal ?
+			SinLut.Length - 1 - (int) roundedIndex :
+			(int) roundedIndex]);
+		var secondNearestValue = (Fix32) ((int) SinLut[flipHorizontal ?
+			SinLut.Length - 1 - (int) roundedIndex - SignI(indexError) :
+			(int) roundedIndex + SignI(indexError)]);
 
-        int delta = (int) indexError.Mul(nearestValue.Sub(secondNearestValue).Abs());
-        var interpolatedValue = (int) nearestValue + (flipHorizontal ? -delta : delta);
-        var finalValue = flipVertical ? -interpolatedValue : interpolatedValue;
-        return (Fix32) (finalValue);
-    }
+		int delta = (int) indexError.Mul(nearestValue.Sub(secondNearestValue).Abs());
+		var interpolatedValue = (int) nearestValue + (flipHorizontal ? -delta : delta);
+		var finalValue = flipVertical ? -interpolatedValue : interpolatedValue;
+		return (Fix32) (finalValue);
+	}
 
-    /// <summary>
-    /// Returns a rough approximation of the Sine of x.
-    /// This is at least 3 times faster than Sin() on x86 and slightly faster than Math.Sin(),
-    /// however its accuracy is limited to 4-5 decimals, for small enough values of x.
-    /// </summary>
-    public static Fix32 SinFast(this Fix32 x) {
+	/// <summary>
+	/// Returns a rough approximation of the Sine of x.
+	/// This is at least 3 times faster than Sin() on x86 and slightly faster than Math.Sin(),
+	/// however its accuracy is limited to 4-5 decimals, for small enough values of x.
+	/// </summary>
+	public static Fix32 SinFast(this Fix32 x) {
 		var clampedL = ClampSinValue((int) x, out bool flipHorizontal, out bool flipVertical);
 
 		// Here we use the fact that the SinLut table has a number of entries
 		// equal to (PI_OVER_2 >> LUT_SIZE_RS) to use the angle to index directly into it
-		var rawIndex = (uint)(clampedL >> LUT_SIZE_RS);
-        if (rawIndex >= LUT_SIZE) {
-            rawIndex = LUT_SIZE - 1;
-        }
-        var nearestValue = SinLut[flipHorizontal ?
-            SinLut.Length - 1 - (int)rawIndex :
-            (int)rawIndex];
-        return (Fix32) (int) (flipVertical ? -nearestValue : nearestValue);
-    }
+		var rawIndex = (uint) (clampedL >> LUT_SIZE_RS);
+		if (rawIndex >= LUT_SIZE) {
+			rawIndex = LUT_SIZE - 1;
+		}
+		var nearestValue = SinLut[flipHorizontal ?
+			SinLut.Length - 1 - (int) rawIndex :
+			(int) rawIndex];
+		return (Fix32) (int) (flipVertical ? -nearestValue : nearestValue);
+	}
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    static long ClampSinValue(long angle, out bool flipHorizontal, out bool flipVertical) {
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	static long ClampSinValue(long angle, out bool flipHorizontal, out bool flipVertical) {
 #if CHECKMATH
-        var clamped2Pi = angle;
-        for (int i = 0; i < LARGE_PI_TIMES; ++i)
-        {
-            clamped2Pi %= (LARGE_PI_RAW >> i);
-        }
+		var clamped2Pi = angle;
+		for (int i = 0; i < LARGE_PI_TIMES; ++i) {
+			clamped2Pi %= (LARGE_PI_RAW >> i);
+		}
 #else
 		// Clamp value to 0 - 2*PI using modulo; this is very slow but there's no better way AFAIK
 		var clamped2Pi = angle % PI_TIMES_2;
 #endif
-        if (angle < 0) {
-            clamped2Pi += PI_TIMES_2;
-        }
+		if (angle < 0) {
+			clamped2Pi += PI_TIMES_2;
+		}
 
-        // The LUT contains values for 0 - PiOver2; every other value must be obtained by
-        // vertical or horizontal mirroring
-        flipVertical = clamped2Pi >= PI;
-        // obtain (angle % PI) from (angle % 2PI) - much faster than doing another modulo
-        var clampedPi = clamped2Pi;
-        while (clampedPi >= PI) {
-            clampedPi -= PI;
-        }
-        flipHorizontal = clampedPi >= PI_OVER_2;
-        // obtain (angle % PI_OVER_2) from (angle % PI) - much faster than doing another modulo
-        var clampedPiOver2 = clampedPi;
-        if (clampedPiOver2 >= PI_OVER_2) {
-            clampedPiOver2 -= PI_OVER_2;
-        }
-        return clampedPiOver2;
-    }
+		// The LUT contains values for 0 - PiOver2; every other value must be obtained by
+		// vertical or horizontal mirroring
+		flipVertical = clamped2Pi >= PI;
+		// obtain (angle % PI) from (angle % 2PI) - much faster than doing another modulo
+		var clampedPi = clamped2Pi;
+		while (clampedPi >= PI) {
+			clampedPi -= PI;
+		}
+		flipHorizontal = clampedPi >= PI_OVER_2;
+		// obtain (angle % PI_OVER_2) from (angle % PI) - much faster than doing another modulo
+		var clampedPiOver2 = clampedPi;
+		if (clampedPiOver2 >= PI_OVER_2) {
+			clampedPiOver2 -= PI_OVER_2;
+		}
+		return clampedPiOver2;
+	}
 
-    /// <summary>
-    /// Returns the cosine of x.
-    /// See Sin() for more details.
-    /// </summary>
-    public static Fix32 Cos(this Fix32 x) {
+	/// <summary>
+	/// Returns the cosine of x.
+	/// See Sin() for more details.
+	/// </summary>
+	public static Fix32 Cos(this Fix32 x) {
 #if USE_DOUBLES
 		return Math.Cos(x.ToDouble()).ToFix32();
 #endif
 		var xl = (int) x;
-        var rawAngle = xl + (xl > 0 ? -PI - PI_OVER_2 : PI_OVER_2);
-        return ((Fix32) rawAngle).Sin();
-    }
+		var rawAngle = xl + (xl > 0 ? -PI - PI_OVER_2 : PI_OVER_2);
+		return ((Fix32) rawAngle).Sin();
+	}
 
-    /// <summary>
-    /// Returns a rough approximation of the cosine of x.
-    /// See FastSin for more details.
-    /// </summary>
-    public static Fix32 CosFast(this Fix32 x) {
+	/// <summary>
+	/// Returns a rough approximation of the cosine of x.
+	/// See FastSin for more details.
+	/// </summary>
+	public static Fix32 CosFast(this Fix32 x) {
 		var xl = (int) x;
 		var rawAngle = xl + (xl > 0 ? -PI - PI_OVER_2 : PI_OVER_2);
-        return ((Fix32) rawAngle).SinFast();
-    }
+		return ((Fix32) rawAngle).SinFast();
+	}
 
-    /// <summary>
-    /// Returns the tangent of x.
-    /// </summary>
-    /// <remarks>
-    /// This function is not well-tested. It may be wildly inaccurate.
-    /// </remarks>
-    public static Fix32 Tan(this Fix32 x) {
+	/// <summary>
+	/// Returns the tangent of x.
+	/// </summary>
+	/// <remarks>
+	/// This function is not well-tested. It may be wildly inaccurate.
+	/// </remarks>
+	public static Fix32 Tan(this Fix32 x) {
 #if USE_DOUBLES
 		return Math.Tan(x.ToDouble()).ToFix32();
 #endif
 		var clampedPi = (int) x % PI;
-        var flip = false;
-        if (clampedPi < 0) {
-            clampedPi = -clampedPi;
-            flip = true;
-        }
-        if (clampedPi > PI_OVER_2) {
-            flip = !flip;
-            clampedPi = PI_OVER_2 - (clampedPi - PI_OVER_2);
-        }
+		var flip = false;
+		if (clampedPi < 0) {
+			clampedPi = -clampedPi;
+			flip = true;
+		}
+		if (clampedPi > PI_OVER_2) {
+			flip = !flip;
+			clampedPi = PI_OVER_2 - (clampedPi - PI_OVER_2);
+		}
 
-        var clamped = (Fix32) clampedPi;
+		var clamped = (Fix32) clampedPi;
 
 		// Find the two closest values in the LUT and perform linear interpolation
 		Fix32 rawIndex = clamped.Mul(LutInterval);
-        Fix32 roundedIndex = rawIndex.Round();
+		Fix32 roundedIndex = rawIndex.Round();
 		Fix32 indexError = rawIndex.Sub(roundedIndex);
 
-        Fix32 nearestValue = (Fix32) ((int) TanLut[(int)roundedIndex]);
-		Fix32 secondNearestValue = (Fix32) ((int) TanLut[(int)roundedIndex + SignI(indexError)]);
+		Fix32 nearestValue = (Fix32) ((int) TanLut[(int) roundedIndex]);
+		Fix32 secondNearestValue = (Fix32) ((int) TanLut[(int) roundedIndex + SignI(indexError)]);
 
-        var delta = (int) indexError.Mul(nearestValue.Sub(secondNearestValue).Abs());
-        var interpolatedValue = (int) nearestValue + delta;
-        var finalValue = flip ? -interpolatedValue : interpolatedValue;
-        return (Fix32) finalValue;
-    }
+		var delta = (int) indexError.Mul(nearestValue.Sub(secondNearestValue).Abs());
+		var interpolatedValue = (int) nearestValue + delta;
+		var finalValue = flip ? -interpolatedValue : interpolatedValue;
+		return (Fix32) finalValue;
+	}
 
 
-    /// <summary>
-    /// Returns the arctan of of the specified number, calculated using Euler series
-    /// </summary>
-    public static Fix32 Atan(this Fix32 zz) {
+	/// <summary>
+	/// Returns the arctan of of the specified number, calculated using Euler series
+	/// </summary>
+	public static Fix32 Atan(this Fix32 zz) {
 #if USE_DOUBLES
 		return Math.Atan(z.ToDouble()).ToFix32();
 #endif
 		Fix32 z = zz;
 		if ((int) z == 0)
-            return Fix32.Zero;
+			return Fix32.Zero;
 
-        // Force positive values for argument
-        // Atan(-z) = -Atan(z).
-        bool neg = ((int) z < 0);
-        if (neg) z = z.Neg();
+		// Force positive values for argument
+		// Atan(-z) = -Atan(z).
+		bool neg = ((int) z < 0);
+		if (neg) z = z.Neg();
 
-        Fix32 result;
+		Fix32 result;
 
-        if (z == Fix32.One)
-            result = Fix32.PiOver4;
-        else
-        {
-            bool invert = z > Fix32.One;
-            if (invert) z = Fix32.One.Div(z);
+		if ((int) z == (int) Fix32.One)
+			result = Fix32.PiOver4;
+		else {
+			bool invert = (int) z > (int) Fix32.One;
+			if (invert) z = Fix32.One.Div(z);
 
-            result = Fix32.One;
+			result = Fix32.One;
 			Fix32 term = Fix32.One;
 
-            Fix32 zSq = z.Mul(z);
-            Fix32 zSq2 = zSq.Mul(Fix32.Two);
-            Fix32 zSqPlusOne = zSq.Add(Fix32.One);
-            Fix32 zSq12 = zSqPlusOne.Mul(Fix32.Two);
-            Fix32 dividend = zSq2;
+			Fix32 zSq = z.Mul(z);
+			Fix32 zSq2 = zSq.Mul(Fix32.Two);
+			Fix32 zSqPlusOne = zSq.Add(Fix32.One);
+			Fix32 zSq12 = zSqPlusOne.Mul(Fix32.Two);
+			Fix32 dividend = zSq2;
 			Fix32 divisor = zSqPlusOne.Mul(Fix32.Three);
 
-            for (int i = 2; i < 30; i++)
-            {
-                term = term.Mul(dividend.Div(divisor));
-                result = result.Add(term);
+			for (int i = 2; i < 30; i++) {
+				term = term.Mul(dividend.Div(divisor));
+				result = result.Add(term);
 
-                dividend = dividend.Add(zSq2);
-                divisor = divisor.Add(zSq12);
+				dividend = dividend.Add(zSq2);
+				divisor = divisor.Add(zSq12);
 
-                if ((int) term == 0)
-                    break;
-            }
+				if ((int) term == 0)
+					break;
+			}
 
-            result = result.Mul(z).Div(zSqPlusOne);
+			result = result.Mul(z).Div(zSqPlusOne);
 
-            if (invert)
-                result = Fix32.PiOver2.Sub(result);
-        }
+			if (invert)
+				result = Fix32.PiOver2.Sub(result);
+		}
 
 		if (neg) result = result.Neg();
-        return result;
-    }
+		return result;
+	}
 
-    public static Fix32 Atan2(this Fix32 y, Fix32 x) {
+	public static Fix32 Atan2(this Fix32 y, Fix32 x) {
 #if USE_DOUBLES
 		return Math.Atan2(y.ToDouble(), x.ToDouble()).ToFix32();
 #endif
 		var yl = (int) y;
-        var xl = (int) x;
-        if (xl == 0)
-        {
-            if (yl > 0)
-                return Fix32.PiOver2;
-            if (yl == 0)
-                return Fix32.Zero;
-            return Fix32.PiOver2.Neg();
-        }
+		var xl = (int) x;
+		if (xl == 0) {
+			if (yl > 0)
+				return Fix32.PiOver2;
+			if (yl == 0)
+				return Fix32.Zero;
+			return Fix32.PiOver2.Neg();
+		}
 		Fix32 atan;
-        var z = y.Div(x);
+		var z = y.Div(x);
 
-        // Deal with overflow
-        if (Fix32.One.Add(C0p28.Mul(z).Mul(z)) == Fix32.MaxValue) {
-            return (int) y < 0 ? Fix32.PiOver2.Neg() : Fix32.PiOver2;
-        }
+		// Deal with overflow
+		if ((int) Fix32.One.Add(C0p28.Mul(z).Mul(z)) == (int) Fix32.MaxValue) {
+			return (int) y < 0 ? Fix32.PiOver2.Neg() : Fix32.PiOver2;
+		}
 
-        if (Abs(z) < Fix32.One) {
-            atan = z.Div(Fix32.One.Add(C0p28.Mul(z).Mul(z)));
-            if (xl < 0)
-            {
-                if (yl < 0)
-                {
-                    return atan.Sub(Fix32.Pi);
-                }
-                return atan.Add(Fix32.Pi);
-            }
-        }
-        else
-        {
-            atan = Fix32.PiOver2.Sub(z.Div(z.Mul(z).Add(C0p28)));
-            if (yl < 0)
-                return atan.Sub(Fix32.Pi);
-        }
+		if ((int) Abs(z) < (int) Fix32.One) {
+			atan = z.Div(Fix32.One.Add(C0p28.Mul(z).Mul(z)));
+			if (xl < 0) {
+				if (yl < 0) {
+					return atan.Sub(Fix32.Pi);
+				}
+				return atan.Add(Fix32.Pi);
+			}
+		}
+		else {
+			atan = Fix32.PiOver2.Sub(z.Div(z.Mul(z).Add(C0p28)));
+			if (yl < 0)
+				return atan.Sub(Fix32.Pi);
+		}
 
-        return atan;
+		return atan;
 	}
 
 	public static Fix32 Atan2Fast(this Fix32 y, Fix32 x) {
@@ -809,11 +838,11 @@ public static partial class Fix32Ext {
 		var z = y.Div(x);
 
 		// Deal with overflow
-		if (Fix32.One.Add(C0p28.Mul(z).Mul(z)) == Fix32.MaxValue) {
+		if ((int) Fix32.One.Add(C0p28.Mul(z).Mul(z)) == (int) Fix32.MaxValue) {
 			return (int) y < 0 ? Fix32.PiOver2.Neg() : Fix32.PiOver2;
 		}
 
-		if (Abs(z) < Fix32.One) {
+		if ((int) Abs(z) < (int) Fix32.One) {
 			atan = z.Div(Fix32.One.Add(C0p28.Mul(z).Mul(z)));
 			if (xl < 0) {
 				if (yl < 0) {
@@ -867,8 +896,7 @@ public static partial class Fix32Ext {
 	public static int ToInt(this Fix32 value) {
 		return (int) value / ONE;
 	}
-		
-		
+
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public static double Clamp(float value, double min, double max) {
@@ -886,13 +914,18 @@ public static partial class Fix32Ext {
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public static int CompareTo(this Fix32 x, Fix32 other) {
-        return ((int) x).CompareTo((int) other);
-    }
+		return ((int) x).CompareTo((int) other);
+	}
 
-    public static string ToStringExt(this Fix32 x) {
-        return x.ToDouble().ToString("0.##########");
-    }
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static string ToStringExt(this Fix32 x) {
+		return x.ToDouble().ToString("0.##########");
+	}
 
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static Fix32 Saturate(long value) {
+		return (Fix32) (int) (((((ulong) value) >> 63) - 1U) ^ (1U << NUM_BITS_MINUS_ONE));
+	}
 
 #if UNITY_EDITOR
 	static void GenerateSinLut(string where) {
