@@ -53,8 +53,8 @@ public static partial class Fix32Ext {
 	internal const int ONE = 1 << FRACTIONAL_BITS;
 	internal const int FRACTIONAL_MASK = ONE - 1;
 	internal const int INTEGER_MASK = ~FRACTIONAL_MASK;
-	internal const int LOG2MAX = (NUM_BITS - 1) << FRACTIONAL_BITS;
-	internal const int LOG2MIN = -(NUM_BITS << FRACTIONAL_BITS);
+	internal const int LOG2MAX = (NUM_BITS - 1 - FRACTIONAL_BITS) << FRACTIONAL_BITS;
+	internal const int LOG2MIN = -((NUM_BITS - FRACTIONAL_BITS) << FRACTIONAL_BITS);
 	internal const int LUT_SIZE_RS = FRACTIONAL_BITS / 2 - 1;
 	internal const int LUT_SIZE = PI_OVER_2 >> LUT_SIZE_RS;
 
@@ -410,6 +410,8 @@ public static partial class Fix32Ext {
 			throw new ArgumentOutOfRangeException("Negative value passed to Sqrt", "x");
 		}
 
+		// https://stackoverflow.com/questions/1100090/looking-for-an-efficient-integer-square-root-algorithm-for-arm-thumb2
+
 		/*
 		uint t, q, b, r;
 		r = (uint) x;
@@ -442,7 +444,7 @@ public static partial class Fix32Ext {
 		long g1 = (g0 + (xx >> s)) >> 1;
 		while (g1 < g0) {
 			g0 = g1;
-			g1 = (g0 + (xx / g0)) >> 1;
+			g1 = (g1 + (xx / g1)) >> 1;
 		}
 		return (Fix32) (g0);
 
@@ -539,27 +541,28 @@ public static partial class Fix32Ext {
 		if (neg) x = x.Neg();
 
 		if ((int) x == (int) Fix32.One)
-			return neg ? (Fix32) Fix32.One.Div(Fix32.Two) : (Fix32) Fix32.Two; // Can be cached
+			return neg ? Fix32.One.Div(Fix32.Two) : Fix32.Two; // Can be cached
 		if ((int) x >= (int) Fix32.Log2Max) return neg ? Fix32.One.Div(Fix32.MaxValue) : Fix32.MaxValue; // Can be cached
 		if ((int) x <= (int) Fix32.Log2Min) return neg ? Fix32.MaxValue : Fix32.Zero;
 
-		/* The algorithm is based on the power series for exp(x):
-            * http://en.wikipedia.org/wiki/Exponential_function#Formal_definition
-            * 
-            * From term n, we get term n+1 by multiplying with x/n.
-            * When the sum term drops to zero, we can stop summing.
-            */
-		int integerPart = (int) ((Fix32) x).Floor();
+		/*
+		The algorithm is based on the power series for exp(x):
+        http://en.wikipedia.org/wiki/Exponential_function#Formal_definition
+        
+        From term n, we get term n+1 by multiplying with x/n.
+        When the sum term drops to zero, we can stop summing.
+        */
+		int integerPart = x.Floor().ToInt();
 		// Take fractional part of exponent
 		x = (Fix32) ((uint) x & FRACTIONAL_MASK);
 
 		Fix32 result = Fix32.One;
 		Fix32 term = Fix32.One;
-		int i = 1;
+		Fix32 i = Fix32.One;
 		while ((int) term != 0) {
-			term = x.Mul(term).Mul(Fix32.Ln2.Div(i.ToFix32()));
+			term = x.Mul(term).Mul(Fix32.Ln2.Div(i));
 			result = result.Add(term);
-			i++;
+			i = i.AddFast(Fix32.One);
 		}
 
 		result = (Fix32) ((int) result << integerPart);

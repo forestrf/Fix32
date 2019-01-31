@@ -57,7 +57,12 @@ public class Fix32Tests {
 
 	static Fix32Tests() {
 		Random r = new Random(0);
-		for (int i = 0; i < 100; i++) TestCases.Add(r.Next());
+		for (int i = 0; i < 100; i++)
+			TestCases.Add(r.Next() % byte.MaxValue);
+		for (int i = 0; i < 250; i++)
+			TestCases.Add(r.Next() % short.MaxValue);
+		for (int i = 0; i < 250; i++)
+			TestCases.Add(r.Next());
 	}
 
 	[Test]
@@ -592,23 +597,29 @@ public class Fix32Tests {
 		}
 	}
 
-	/*
 	[Test]
-	public void Pow2() {
+	public void T022_Pow2() {
+		List<double> deltas = new List<double>();
+
 		for (int i = 0; i < TestCases.Count; ++i) {
-			var e = Fix64.FromRaw(TestCases[i]);
+			var e = (Fix32) TestCases[i];
 
-			var expected = Math.Min(Math.Pow(2, (double) e), (double) Fix64.MaxValue);
-			var actual = (double) Fix64.Pow2(e);
+			var expected = Math.Min(Math.Pow(2, e.ToDouble()), Fix32.MaxValue.ToDouble());
+			var actual = e.Pow2().ToDouble();
 
-			double maxDelta = Math.Abs((double) e) > 100000000 ? 0.5 :
-				expected > 100000000 ? 10 :
-				expected > 1000 ? 0.5 :
-				32 * (double) Fix32Ext.Precision;
+			double maxDelta = 
+				expected > 10 ? 29 * (double) Fix32Ext.Precision :
+				expected > 5 ? 16 * (double) Fix32Ext.Precision :
+				expected > 2 ? 14 * (double) Fix32Ext.Precision :
+				expected > 1 ? 8 * (double) Fix32Ext.Precision :
+				2 * (double) Fix32Ext.Precision;
 
-			Assert.AreEqual(expected, actual, maxDelta, string.Format("Pow2({0}) = expected {1} but got {2}", e, expected, actual));
+			Assert.AreEqual(expected, actual, maxDelta, "Pow2(" + e.ToStringExt() + ")" + Delta(expected, actual, deltas));
 		}
+		DeltasStatistics(deltas);
 	}
+
+	/*
 
 	[Test]
 	public void Pow() {
