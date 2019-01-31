@@ -1,6 +1,6 @@
-﻿#define CHECKMATH
-//#define USE_DOUBLES // Used for testing
+﻿//#define USE_DOUBLES // Used for testing
 
+using FixPointCS;
 using System;
 using System.Runtime.CompilerServices;
 
@@ -14,6 +14,7 @@ public enum Fix32 : int {
 	Three = One * 3,
 	Two = One * 2,
 	One = Fix32Ext.ONE,
+	Half = Fix32Ext.HALF,
 	Zero = 0,
 	MinusOne = -One,
 	MinusTwo = -One * 2,
@@ -38,18 +39,19 @@ public enum Fix32 : int {
 public static partial class Fix32Ext {
 
 	// Precision of this type is 2^-14, that is 6.103515625E-5
-	public static readonly decimal Precision = ((Fix32) 1).ToDecimal();
+	public static readonly double Precision = ((Fix32) 1).ToDouble();
 
 	public const int MAX_VALUE = int.MaxValue;
 	public const int MIN_VALUE = int.MinValue;
 	public const int MAX_INT_VALUE = int.MaxValue >> FRACTIONAL_BITS;
 	public const int MIN_INT_VALUE = int.MinValue >> FRACTIONAL_BITS;
 	public const int NUM_BITS = 32;
-	public const int FRACTIONAL_BITS = 14;
+	public const int FRACTIONAL_BITS = 16;
 	public const int SIGNED_INTEGER_BITS = NUM_BITS - FRACTIONAL_BITS;
 
 	public const int NUM_BITS_MINUS_ONE = NUM_BITS - 1;
 	public const int ONE = 1 << FRACTIONAL_BITS;
+	public const int HALF = 1 << (FRACTIONAL_BITS - 1);
 	public const int FRACTIONAL_MASK = ONE - 1;
 	public const int INTEGER_MASK = ~FRACTIONAL_MASK;
 	public const int SIGN_MASK = unchecked((int) (1U << NUM_BITS_MINUS_ONE));
@@ -58,8 +60,8 @@ public static partial class Fix32Ext {
 	internal const int LUT_SIZE_RS = FRACTIONAL_BITS / 2 - 1;
 	internal const int LUT_SIZE = PI_OVER_2 >> LUT_SIZE_RS;
 
-	static readonly Fix32 LutInterval = (LUT_SIZE - 1).ToFix32().Div(Fix32.PiOver2);
-	static readonly Fix32 C0p28 = 0.28m.ToFix32();
+	static readonly Fix32 LutInterval = ((LUT_SIZE - 1) / PI_OVER_2).ToFix32();
+	static readonly Fix32 C0p28 = 0.28.ToFix32();
 
 	// Const before rounding
 	const decimal D_PI = ONE * (3.1415926535897932384626433832795028841971693993751058209749445923078164m);
@@ -104,7 +106,7 @@ public static partial class Fix32Ext {
 		//int comp = ret - xRaw;
 		// the condition is equivalent to
 		// ((x < 0) && (y > comp)) || ((x >=0) && (y <= comp))
-		return (Fix32) (((int) x < 0) != ((int) y > (ret - (int) x)) ? ret : (int) x + (int) y);
+		return (Fix32) ((x < 0) != ((int) y > (ret - (int) x)) ? ret : (int) x + (int) y);
 	}
 
 	/// <summary>
@@ -256,6 +258,14 @@ public static partial class Fix32Ext {
 	}
 
 	/// <summary>
+	/// Rounds a value to the nearest integral value. Overflows in the extremes.
+	/// </summary>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static Fix32 RoundFastOverflow(this Fix32 x) {
+		return (Fix32) (((int) x + HALF) & INTEGER_MASK);
+	}
+
+	/// <summary>
 	/// Multiply. Saturates when overflows
 	/// </summary>
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -287,52 +297,29 @@ public static partial class Fix32Ext {
 #if USE_DOUBLES
 		return (x.ToDouble() / y.ToDouble()).ToFix32();
 #endif
-		long xl = (int) x;
-
 		if ((int) y == 0) {
-			return (Fix32) (unchecked((int) (((((uint) xl) >> NUM_BITS_MINUS_ONE) - 1U) ^ (1U << NUM_BITS_MINUS_ONE))));
-			return xl >= 0 ? Fix32.MaxValue : Fix32.MinValue; // Branched version of the previous code, for clarity. Slower
+			return (Fix32) (unchecked((int) (((((uint) x) >> NUM_BITS_MINUS_ONE) - 1U) ^ (1U << NUM_BITS_MINUS_ONE))));
+			return x >= 0 ? Fix32.MaxValue : Fix32.MinValue; // Branched version of the previous code, for clarity. Slower
 		}
 
-		long a = xl << FRACTIONAL_BITS;
-		long b = (int) y;
-		long r = a / b;
+		long r = ((long) x << FRACTIONAL_BITS) / (int) y;
 		if (r > MAX_VALUE) return Fix32.MaxValue;
 		if (r < MIN_VALUE) return Fix32.MinValue;
 		return (Fix32) (int) r;
 	}
 
 	/// <summary>
-	/// Divide. Copied from DOOM. Wrong?
+	/// Divide. Overflows
 	/// </summary>
 	public static Fix32 DivFast(this Fix32 x, Fix32 y) {
-		//x = Fix32.MinValue;
-		//y = Fix32.MinusOne;
-		int xAbs = (int) x.Abs();
-		int yAbs = (int) y.Abs();
-		if ((xAbs >> 17/*((NUM_BITS - FRACTIONAL_PLACES) - 2)*/) >= yAbs)
-			return ((int) x ^ (int) y) < 0 ? Fix32.MinValue : Fix32.MaxValue;
-		return x.DivFastOverflow(y);
+		if ((int) y == 0) {
+			return (Fix32) (unchecked((int) (((((uint) x) >> NUM_BITS_MINUS_ONE) - 1U) ^ (1U << NUM_BITS_MINUS_ONE))));
+			return x >= 0 ? Fix32.MaxValue : Fix32.MinValue; // Branched version of the previous code, for clarity. Slower
+		}
+
+		return (Fix32) (int) (((long) x << FRACTIONAL_BITS) / (int) y);
 	}
-
-	/// <summary>
-	/// Divide. Copied from DOOM. Wrong?
-	/// </summary>
-	public static Fix32 DivFastOverflow(this Fix32 x, Fix32 y) {
-#if true
-		long c = (((long) x) << FRACTIONAL_BITS) / (long) y;
-		return (Fix32) c;
-#endif
-		/*
-		// From DOOM
-		double c = ((double) x) / ((double) y) * (int) Fix32.One;
-
-		if (c >= 2147483648.0 || c < -2147483648.0)
-			I_Error("FixedDiv: divide by zero");
-		return c.ToFix32();
-		*/
-	}
-
+	
 	/// <summary>
 	/// Returns the base-2 logarithm of a specified number.
 	/// </summary>
@@ -345,6 +332,8 @@ public static partial class Fix32Ext {
 #endif
 		if ((int) x <= 0)
 			throw new ArgumentOutOfRangeException("Non-positive value passed to Ln", "x");
+
+		//return (Fix32) Fixed32.Log2((int) x);
 
 		// This implementation is based on Clay. S. Turner's fast binary logarithm
 		// algorithm (C. S. Turner,  "A Fast Binary Logarithm Algorithm", IEEE Signal
@@ -455,31 +444,25 @@ public static partial class Fix32Ext {
 	/// <exception cref="ArgumentOutOfRangeException">
 	/// The argument was negative.
 	/// </exception>
-	public static Fix32 Sqrt(this Fix32 x) {
+	public static Fix32 SqrtSlow(this Fix32 x) {
 #if USE_DOUBLES
 		return Math.Sqrt(x.ToDouble()).ToFix32();
 #endif
-		if (x < 0) {
-			// We cannot represent infinities like Single and Double, and Sqrt is
-			// mathematically undefined for x < 0. So we just throw an exception.
-			throw new ArgumentOutOfRangeException("Negative value passed to Sqrt", "x");
-		}
+		if (x <= 0) return 0;
 
 		// https://stackoverflow.com/questions/1100090/looking-for-an-efficient-integer-square-root-algorithm-for-arm-thumb2
 
-		const int SHIFT = NUM_BITS;
 		// Manually calculated constants (somehow) for precision Q18.14
-		const int ITERATIONS = (((SHIFT - 16) / 4) * 2) + 16; // 24
+		const int ITERATIONS = 25;// (((NUM_BITS - 16) / 4) * 2) + 16; // 24
 
-		int shift = SHIFT - 2;
+		int shift = NUM_BITS - 2;
 
 		// [1] First iteration
 		int bottomHalf = 0; // 0x3 & ((int) x >> SHIFT); equals 0
 
 		int a = 0; // accumulator
 		int r = 0; // remainder
-		int i = 0;
-		while (i++ < ITERATIONS) {
+		for (int i = 0; i < ITERATIONS; i++) {
 			r = (r << 2) | bottomHalf;
 			a <<= 1;
 			int e = (a << 1) | 1; // trial product
@@ -493,45 +476,20 @@ public static partial class Fix32Ext {
 		}
 
 		return (Fix32) a;
+	}
 
+	/// <summary>
+	/// Returns the square root of a specified number.
+	/// </summary>
+	/// <exception cref="ArgumentOutOfRangeException">
+	/// The argument was negative.
+	/// </exception>
+	public static Fix32 Sqrt(this Fix32 x) {
+#if USE_DOUBLES
+		return Math.Sqrt(x.ToDouble()).ToFix32();
+#endif
 
-
-
-		/*
-		uint r = (uint) x;
-		uint b = 0x40000000;
-		uint q = 0;
-		while (b > 0x40) {
-			uint t = q + b;
-			if (r >= t) {
-				r -= t;
-				q = t + b; // equivalent to q += 2*b
-			}
-			r <<= 1;
-			b >>= 1;
-		}
-		q >>= 8;
-		return (Fix32) q;
-		*/
-		/*
-		long xx = (long) x << FRACTIONAL_BITS;
-		if (xx <= 1) return x;
-
-		int s = 1;
-		long x1 = xx - 1;
-		if (x1 > 4294967295) { s += 16; x1 >>= 32; }
-		if (x1 > 65535) { s += 8; x1 >>= 16; }
-		if (x1 > 255) { s += 4; x1 >>= 8; }
-		if (x1 > 15) { s += 2; x1 >>= 4; }
-		if (x1 > 3) { s += 1; }
-		long g0 = 1L << s;
-		long g1 = (g0 + (xx >> s)) >> 1;
-		while (g1 < g0) {
-			g0 = g1;
-			g1 = (g1 + (xx / g1)) >> 1;
-		}
-		return (Fix32) (g0);
-		*/
+		return (Fix32) Fixed32.Sqrt((int) x);
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -601,7 +559,18 @@ public static partial class Fix32Ext {
 	}
 
 	/// <summary>
-	/// Returns a specified number raised to the specified power.
+	/// Returns 2 raised to the specified power.
+	/// </summary>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static Fix32 Pow2Fast(this Fix32 xx) {
+#if USE_DOUBLES
+		return Math.Pow(2, x.ToDouble()).ToFix32();
+#endif
+		return (Fix32) Fixed32.Pow(2, (int) xx);
+	}
+
+	/// <summary>
+	/// Returns a specified number raised to the specified power. Saturates
 	/// </summary>
 	/// <exception cref="DivideByZeroException">
 	/// The base was zero, with a negative exponent
@@ -624,8 +593,100 @@ public static partial class Fix32Ext {
 			return Fix32.Zero;
 		}
 
-		Fix32 log2 = b.Log2();
-		return exp.Mul(log2).Pow2();
+		if (b < 0 && exp != 0)
+			throw new ArgumentOutOfRangeException("Non-positive value passed to Ln", "x");
+
+		return exp.Mul(b.Log2()).Pow2();
+	}
+
+	/// <summary>
+	/// Returns the Sine of x.
+	/// </summary>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static Fix32 Sin(this Fix32 x) {
+#if USE_DOUBLES
+        return (Fix64) Math.Sin((double) x);
+#endif
+		return (Fix32) Fixed32.Sin((int) x);
+	}
+
+	/// <summary>
+	/// Returns the Sine of x.
+	/// </summary>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static Fix32 SinFast(this Fix32 x) {
+		return (Fix32) Fixed32.SinFast((int) x);
+	}
+
+	/// <summary>
+	/// Returns the Sine of x.
+	/// </summary>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static Fix32 SinFastest(this Fix32 x) {
+		return (Fix32) Fixed32.SinFastest((int) x);
+	}
+
+	/// <summary>
+	/// Returns the cosine of x.
+	/// </summary>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static Fix32 Cos(this Fix32 x) {
+#if USE_DOUBLES
+		return Math.Cos(x.ToDouble()).ToFix32();
+#endif
+		var rawAngle = (int) x + (x > 0 ? -PI - PI_OVER_2 : PI_OVER_2);
+		return ((Fix32) rawAngle).Sin();
+	}
+
+	/// <summary>
+	/// Returns the cosine of x.
+	/// </summary>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static Fix32 CosFast(this Fix32 x) {
+		var rawAngle = (int) x + (x > 0 ? -PI - PI_OVER_2 : PI_OVER_2);
+		return ((Fix32) rawAngle).SinFast();
+	}
+
+	/// <summary>
+	/// Returns the cosine of x.
+	/// </summary>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static Fix32 CosFastest(this Fix32 x) {
+		var rawAngle = (int) x + (x > 0 ? -PI - PI_OVER_2 : PI_OVER_2);
+		return ((Fix32) rawAngle).SinFastest();
+	}
+
+	/// <summary>
+	/// Returns the tangent of x.
+	/// </summary>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static Fix32 Tan(this Fix32 x) {
+#if USE_DOUBLES
+		return Math.Tan(x.ToDouble()).ToFix32();
+#endif
+		return (Fix32) Fixed32.Tan((int) x);
+	}
+
+	/// <summary>
+	/// Returns the tangent of x.
+	/// </summary>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static Fix32 TanFast(this Fix32 x) {
+#if USE_DOUBLES
+		return Math.Tan(x.ToDouble()).ToFix32();
+#endif
+		return (Fix32) Fixed32.TanFast((int) x);
+	}
+
+	/// <summary>
+	/// Returns the tangent of x.
+	/// </summary>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static Fix32 TanFastest(this Fix32 x) {
+#if USE_DOUBLES
+		return Math.Tan(x.ToDouble()).ToFix32();
+#endif
+		return (Fix32) Fixed32.TanFastest((int) x);
 	}
 
 	/// <summary>
@@ -643,156 +704,6 @@ public static partial class Fix32Ext {
 
 		var result = (Fix32.One.Sub(x.Mul(x))).Sqrt().Div(x).Atan();
 		return (int) x < 0 ? result.Add(Fix32.Pi) : result;
-	}
-
-	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	static int CountLeadingZeroes(ulong x) {
-		int result = 0;
-		while ((x & 0xF000000000000000) == 0) { result += 4; x <<= 4; }
-		while ((x & 0x8000000000000000) == 0) { result += 1; x <<= 1; }
-		return result;
-	}
-
-	/// <summary>
-	/// Returns the Sine of x.
-	/// The relative error is less than 1E-10 for x in [-2PI, 2PI], and less than 1E-7 in the worst case.
-	/// </summary>
-	public static Fix32 Sin(this Fix32 x) {
-#if USE_DOUBLES
-        return (Fix64) Math.Sin((double) x);
-#endif
-		var clampedRaw = ClampSinValue((int) x, out var flipHorizontal, out var flipVertical);
-		var clamped = (Fix32) ((int) clampedRaw);
-
-		// Find the two closest values in the LUT and perform linear interpolation
-		// This is what kills the performance of this function on x86 - x64 is fine though
-		Fix32 rawIndex = clamped.Mul(LutInterval);
-		Fix32 roundedIndex = rawIndex.Round();
-		Fix32 indexError = rawIndex.Sub(roundedIndex);
-
-		var nearestValue = (Fix32) ((int) SinLut[flipHorizontal ?
-			SinLut.Length - 1 - (int) roundedIndex :
-			(int) roundedIndex]);
-		var secondNearestValue = (Fix32) ((int) SinLut[flipHorizontal ?
-			SinLut.Length - 1 - (int) roundedIndex - SignI(indexError) :
-			(int) roundedIndex + SignI(indexError)]);
-
-		int delta = (int) indexError.Mul(nearestValue.Sub(secondNearestValue).Abs());
-		var interpolatedValue = (int) nearestValue + (flipHorizontal ? -delta : delta);
-		var finalValue = flipVertical ? -interpolatedValue : interpolatedValue;
-		return (Fix32) (finalValue);
-	}
-
-	/// <summary>
-	/// Returns a rough approximation of the Sine of x.
-	/// This is at least 3 times faster than Sin() on x86 and slightly faster than Math.Sin(),
-	/// however its accuracy is limited to 4-5 decimals, for small enough values of x.
-	/// </summary>
-	public static Fix32 SinFast(this Fix32 x) {
-		var clampedL = ClampSinValue((int) x, out bool flipHorizontal, out bool flipVertical);
-
-		// Here we use the fact that the SinLut table has a number of entries
-		// equal to (PI_OVER_2 >> LUT_SIZE_RS) to use the angle to index directly into it
-		var rawIndex = (uint) (clampedL >> LUT_SIZE_RS);
-		if (rawIndex >= LUT_SIZE) {
-			rawIndex = LUT_SIZE - 1;
-		}
-		var nearestValue = SinLut[flipHorizontal ?
-			SinLut.Length - 1 - (int) rawIndex :
-			(int) rawIndex];
-		return (Fix32) (int) (flipVertical ? -nearestValue : nearestValue);
-	}
-
-	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	static long ClampSinValue(long angle, out bool flipHorizontal, out bool flipVertical) {
-#if CHECKMATH
-		var clamped2Pi = angle;
-		for (int i = 0; i < LARGE_PI_TIMES; ++i) {
-			clamped2Pi %= (LARGE_PI_RAW >> i);
-		}
-#else
-		// Clamp value to 0 - 2*PI using modulo; this is very slow but there's no better way AFAIK
-		var clamped2Pi = angle % PI_TIMES_2;
-#endif
-		if (angle < 0) {
-			clamped2Pi += PI_TIMES_2;
-		}
-
-		// The LUT contains values for 0 - PiOver2; every other value must be obtained by
-		// vertical or horizontal mirroring
-		flipVertical = clamped2Pi >= PI;
-		// obtain (angle % PI) from (angle % 2PI) - much faster than doing another modulo
-		var clampedPi = clamped2Pi;
-		while (clampedPi >= PI) {
-			clampedPi -= PI;
-		}
-		flipHorizontal = clampedPi >= PI_OVER_2;
-		// obtain (angle % PI_OVER_2) from (angle % PI) - much faster than doing another modulo
-		var clampedPiOver2 = clampedPi;
-		if (clampedPiOver2 >= PI_OVER_2) {
-			clampedPiOver2 -= PI_OVER_2;
-		}
-		return clampedPiOver2;
-	}
-
-	/// <summary>
-	/// Returns the cosine of x.
-	/// See Sin() for more details.
-	/// </summary>
-	public static Fix32 Cos(this Fix32 x) {
-#if USE_DOUBLES
-		return Math.Cos(x.ToDouble()).ToFix32();
-#endif
-		var xl = (int) x;
-		var rawAngle = xl + (xl > 0 ? -PI - PI_OVER_2 : PI_OVER_2);
-		return ((Fix32) rawAngle).Sin();
-	}
-
-	/// <summary>
-	/// Returns a rough approximation of the cosine of x.
-	/// See FastSin for more details.
-	/// </summary>
-	public static Fix32 CosFast(this Fix32 x) {
-		var xl = (int) x;
-		var rawAngle = xl + (xl > 0 ? -PI - PI_OVER_2 : PI_OVER_2);
-		return ((Fix32) rawAngle).SinFast();
-	}
-
-	/// <summary>
-	/// Returns the tangent of x.
-	/// </summary>
-	/// <remarks>
-	/// This function is not well-tested. It may be wildly inaccurate.
-	/// </remarks>
-	public static Fix32 Tan(this Fix32 x) {
-#if USE_DOUBLES
-		return Math.Tan(x.ToDouble()).ToFix32();
-#endif
-		var clampedPi = (int) x % PI;
-		var flip = false;
-		if (clampedPi < 0) {
-			clampedPi = -clampedPi;
-			flip = true;
-		}
-		if (clampedPi > PI_OVER_2) {
-			flip = !flip;
-			clampedPi = PI_OVER_2 - (clampedPi - PI_OVER_2);
-		}
-
-		var clamped = (Fix32) clampedPi;
-
-		// Find the two closest values in the LUT and perform linear interpolation
-		Fix32 rawIndex = clamped.Mul(LutInterval);
-		Fix32 roundedIndex = rawIndex.Round();
-		Fix32 indexError = rawIndex.Sub(roundedIndex);
-
-		Fix32 nearestValue = (Fix32) ((int) TanLut[(int) roundedIndex]);
-		Fix32 secondNearestValue = (Fix32) ((int) TanLut[(int) roundedIndex + SignI(indexError)]);
-
-		var delta = (int) indexError.Mul(nearestValue.Sub(secondNearestValue).Abs());
-		var interpolatedValue = (int) nearestValue + delta;
-		var finalValue = flip ? -interpolatedValue : interpolatedValue;
-		return (Fix32) finalValue;
 	}
 
 
@@ -937,6 +848,10 @@ public static partial class Fix32Ext {
 		return (Fix32) (int) Clamp(value * ONE, MIN_VALUE, MAX_VALUE);
 	}
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static Fix32 ToFix32Fast(this float value) {
+		return (Fix32) (int) (value * ONE);
+	}
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public static float ToFloat(this Fix32 value) {
 		return (float) value / ONE;
 	}
@@ -946,22 +861,21 @@ public static partial class Fix32Ext {
 		return (Fix32) (int) Clamp(value * ONE, MIN_VALUE, MAX_VALUE);
 	}
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static Fix32 ToFix32Fast(this double value) {
+		return (Fix32) (int) (value * ONE);
+	}
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public static double ToDouble(this Fix32 value) {
 		return (double) value / ONE;
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	public static Fix32 ToFix32(this decimal value) {
-		return (Fix32) (int) Clamp(value * ONE, MIN_VALUE, MAX_VALUE);
-	}
-	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	public static decimal ToDecimal(this Fix32 value) {
-		return (decimal) value / ONE;
-	}
-
-	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public static Fix32 ToFix32(this int value) {
 		return (Fix32) (value > MAX_INT_VALUE ? MAX_VALUE : value < MIN_INT_VALUE ? MIN_VALUE : value * ONE);
+	}
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static Fix32 ToFix32Fast(this int value) {
+		return (Fix32) (value * ONE);
 	}
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public static int ToInt(this Fix32 value) {
@@ -997,102 +911,4 @@ public static partial class Fix32Ext {
 	public static Fix32 Saturate(long value) {
 		return (Fix32) (int) (((((ulong) value) >> 63) - 1U) ^ (1U << NUM_BITS_MINUS_ONE));
 	}
-
-#if UNITY_EDITOR
-	static void GenerateSinLut(string where) {
-		CalculateLargePI(out Fix32 largePIF32, out int N);
-
-		using (var writer = new System.IO.StreamWriter(where + "/Fix32SinLut.cs")) {
-            writer.Write(
-@"namespace FixMath.NET {
-public static partial class Fix32Ext {
-	const int LARGE_PI_RAW = " + (int) largePIF32 + @";
-	const int LARGE_PI_TIMES = " + N + @";
-
-	internal static readonly int[] SinLut = new int[" + LUT_SIZE + "] {");
-            int lineCounter = 0;
-            for (int i = 0; i < LUT_SIZE; ++i) {
-                var angle = i * 3.1415926535897932384626433832795028841971693993751058209749445923078164m * 0.5m / (LUT_SIZE - 1);
-                if (lineCounter++ % 8 == 0) {
-                    writer.WriteLine();
-                    writer.Write("			");
-                }
-                var sin = Math.Sin((double) angle);
-                var rawValue = (int) sin.ToFix32();
-                writer.Write(string.Format("0x{0:X}U, ", rawValue));
-            }
-            writer.Write(
-@"
-	};
-}
-}");
-        }
-    }
-
-    static void GenerateTanLut(string where) {
-        using (var writer = new System.IO.StreamWriter(where + "/Fix32TanLut.cs")) {
-            writer.Write(
-@"namespace FixMath.NET {
-public static partial class Fix32Ext {
-	internal static readonly int[] TanLut = new int[" + LUT_SIZE + "] {");
-            int lineCounter = 0;
-            for (int i = 0; i < LUT_SIZE; ++i) {
-                var angle = i * 3.1415926535897932384626433832795028841971693993751058209749445923078164m * 0.5m / (LUT_SIZE - 1);
-                if (lineCounter++ % 8 == 0) {
-                    writer.WriteLine();
-                    writer.Write("			");
-                }
-                var tan = Math.Tan((double) angle);
-                if (tan > Fix32.MaxValue.ToDouble() || tan < 0.0) {
-                    tan = Fix32.MaxValue.ToDouble();
-                }
-                var rawValue = (int) (((decimal)tan > Fix32.MaxValue.ToDecimal() || tan < 0.0) ? Fix32.MaxValue : tan.ToFix32());
-                writer.Write(string.Format("0x{0:X}U, ", rawValue));
-            }
-            writer.Write(
-@"
-	};
-}
-}");
-        }
-    }
-
-	// Obtained from ((Fix64)1686629713.065252369824872831112M).RawValue
-	// This is (2^29)*PI, where 29 is the largest N such that (2^N)*PI < MaxValue.
-	// The idea is that this number contains way more precision than PI_TIMES_2,
-	// and (((x % (2^29*PI)) % (2^28*PI)) % ... (2^1*PI) = x % (2 * PI)
-	// In practice this gives us an error of about 1,25e-9 in the worst case scenario (Sin(MaxValue))
-	// Whereas simply doing x % PI_TIMES_2 is the 2e-3 range.
-	static void CalculateLargePI(out Fix32 largePIF64, out int N) {
-		int prevN = 0;
-		N = 0;
-		decimal largePI = 0;
-		decimal prevLargePI = 0;
-
-		do {
-			prevN = N++;
-			prevLargePI = largePI;
-
-			decimal sqrd = 2;
-			for (int i = 1; i < N; i++) {
-				sqrd *= 2;
-			}
-			largePI = sqrd * (decimal) Math.PI;
-		}
-		while (largePI < Fix32.MaxValue.ToDecimal());
-		N = prevN;
-		largePIF64 = prevLargePI.ToFix32();
-	}
-
-	// turn into a Console Application and use this to generate the look-up tables
-	[UnityEditor.MenuItem("Tools/Fix64 Regenerate LUT")]
-    static void GenerateLut() {
-		string thisFile = new System.Diagnostics.StackTrace(true).GetFrame(0).GetFileName();
-		thisFile = thisFile.Replace('\\', '/');
-		string path = thisFile.Substring(0, thisFile.LastIndexOf('/'));
-        GenerateSinLut(path);
-        GenerateTanLut(path);
-		UnityEditor.AssetDatabase.Refresh();
-    }
-#endif
 }

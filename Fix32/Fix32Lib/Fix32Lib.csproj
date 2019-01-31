@@ -45,9 +45,13 @@
   <ItemGroup>
     <Compile Include="Fix32.cs" />
     <Compile Include="Fix32Random.cs" />
-    <Compile Include="Fix32SinLut.cs" />
-    <Compile Include="Fix32TanLut.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\FixPointCS-master\FixPointCS\FixPointCS.csproj">
+      <Project>{53D6F31F-AE20-4C5C-9674-0CA79E4C36C1}</Project>
+      <Name>FixPointCS</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

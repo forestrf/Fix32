@@ -1,0 +1,6 @@
+.vs
+*.user
+*.class
+Cpp/x64
+obj
+bin
