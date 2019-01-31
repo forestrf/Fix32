@@ -40,21 +40,21 @@ public static partial class Fix32Ext {
 	// Precision of this type is 2^-14, that is 6.103515625E-5
 	public static readonly decimal Precision = ((Fix32) 1).ToDecimal();
 
-	internal const int MAX_VALUE = int.MaxValue;
-	internal const int MIN_VALUE = int.MinValue;
-	internal const int MAX_INT_VALUE = int.MaxValue >> FRACTIONAL_BITS;
-	internal const int MIN_INT_VALUE = int.MinValue >> FRACTIONAL_BITS;
+	public const int MAX_VALUE = int.MaxValue;
+	public const int MIN_VALUE = int.MinValue;
+	public const int MAX_INT_VALUE = int.MaxValue >> FRACTIONAL_BITS;
+	public const int MIN_INT_VALUE = int.MinValue >> FRACTIONAL_BITS;
 	public const int NUM_BITS = 32;
 	public const int FRACTIONAL_BITS = 14;
-	internal const int SIGNED_INTEGER_PLACES = NUM_BITS - FRACTIONAL_BITS;
-	internal const int SIGN_MASK = unchecked((int) (1U << NUM_BITS_MINUS_ONE));
+	public const int SIGNED_INTEGER_BITS = NUM_BITS - FRACTIONAL_BITS;
 
-	internal const int NUM_BITS_MINUS_ONE = NUM_BITS - 1;
-	internal const int ONE = 1 << FRACTIONAL_BITS;
-	internal const int FRACTIONAL_MASK = ONE - 1;
-	internal const int INTEGER_MASK = ~FRACTIONAL_MASK;
-	internal const int LOG2MAX = (NUM_BITS - 1 - FRACTIONAL_BITS) << FRACTIONAL_BITS;
-	internal const int LOG2MIN = -((NUM_BITS - FRACTIONAL_BITS) << FRACTIONAL_BITS);
+	public const int NUM_BITS_MINUS_ONE = NUM_BITS - 1;
+	public const int ONE = 1 << FRACTIONAL_BITS;
+	public const int FRACTIONAL_MASK = ONE - 1;
+	public const int INTEGER_MASK = ~FRACTIONAL_MASK;
+	public const int SIGN_MASK = unchecked((int) (1U << NUM_BITS_MINUS_ONE));
+	public const int LOG2MAX = (NUM_BITS - 1 - FRACTIONAL_BITS) << FRACTIONAL_BITS;
+	public const int LOG2MIN = -((NUM_BITS - FRACTIONAL_BITS) << FRACTIONAL_BITS);
 	internal const int LUT_SIZE_RS = FRACTIONAL_BITS / 2 - 1;
 	internal const int LUT_SIZE = PI_OVER_2 >> LUT_SIZE_RS;
 
@@ -352,32 +352,87 @@ public static partial class Fix32Ext {
 
 		//https://github.com/dmoulding/log2fix/blob/master/log2fix.c
 
-		int b = 1 << (FRACTIONAL_BITS - 1);
-		int y = 0;
+		const int EXTRA_SHIFT = 8;
+		long xx = (long) x << EXTRA_SHIFT;
+		const int PRECISION = FRACTIONAL_BITS + EXTRA_SHIFT;
 
-		int rawX = (int) x;
-		while (rawX < 1 << FRACTIONAL_BITS) {
+		long b = 1 << (PRECISION - 1);
+		long y = 0;
+
+		long rawX = (long) xx;
+		while (rawX < 1 << PRECISION) {
 			rawX <<= 1;
-			y -= 1 << FRACTIONAL_BITS;
+			y -= 1 << PRECISION;
 		}
 
-		while (rawX >= 2 << FRACTIONAL_BITS) {
+		while (rawX >= 2 << PRECISION) {
 			rawX >>= 1;
-			y += 1 << FRACTIONAL_BITS;
+			y += 1 << PRECISION;
 		}
 
 		ulong z = (ulong) rawX;
 
-		for (int i = 0; i < FRACTIONAL_BITS; i++) {
-			z = z * z >> FRACTIONAL_BITS;
-			if (z >= 2 << FRACTIONAL_BITS) {
+		for (int i = 0; i < PRECISION; i++) {
+			z = z * z >> PRECISION;
+			if (z >= 2 << PRECISION) {
 				z >>= 1;
 				y += b;
 			}
 			b >>= 1;
 		}
 
-		return (Fix32) (int) y;
+		return (Fix32) (int) (y >> EXTRA_SHIFT);
+	}
+
+	/// <summary>
+	/// Returns the base-2 logarithm of a specified number.
+	/// </summary>
+	/// <exception cref="ArgumentOutOfRangeException">
+	/// The argument was non-positive
+	/// </exception>
+	public static Fix32 Log2Fast(this Fix32 x) {
+#if USE_DOUBLES
+		return Math.Log(x.ToDouble(), 2).ToFix32();
+#endif
+		if ((int) x <= 0)
+			throw new ArgumentOutOfRangeException("Non-positive value passed to Ln", "x");
+
+		//return (Fix32) Fixed32.Log2((int) x);
+
+		// This implementation is based on Clay. S. Turner's fast binary logarithm
+		// algorithm (C. S. Turner,  "A Fast Binary Logarithm Algorithm", IEEE Signal
+		//     Processing Mag., pp. 124,140, Sep. 2010.)
+
+		//https://github.com/dmoulding/log2fix/blob/master/log2fix.c
+		
+		const int PRECISION = FRACTIONAL_BITS;
+
+		int b = 1 << (PRECISION - 1);
+		int y = 0;
+
+		int rawX = (int) x;
+		while (rawX < 1 << PRECISION) {
+			rawX <<= 1;
+			y -= 1 << PRECISION;
+		}
+
+		while (rawX >= 2 << PRECISION) {
+			rawX >>= 1;
+			y += 1 << PRECISION;
+		}
+
+		ulong z = (ulong) rawX;
+
+		for (int i = 0; i < PRECISION; i++) {
+			z = z * z >> PRECISION;
+			if (z >= 2 << PRECISION) {
+				z >>= 1;
+				y += b;
+			}
+			b >>= 1;
+		}
+
+		return (Fix32) (int) (y);
 	}
 
 	/// <summary>
@@ -412,13 +467,39 @@ public static partial class Fix32Ext {
 
 		// https://stackoverflow.com/questions/1100090/looking-for-an-efficient-integer-square-root-algorithm-for-arm-thumb2
 
+		long xx = (int) x;
+
+		long a = 0L; // accumulator
+		long r = 0L; // remainder
+
+		// Manually calculated constants (somehow) for precision Q18.14
+		const int SHIFT = 32;
+		const int ITERATIONS = (((SHIFT - 16) / 4) * 2) + 16; // 24
+
+		int shift = SHIFT;
+
+		for (int i = 0; i < ITERATIONS; i++) {
+			r = (r << 2) | (3L & (xx >> shift)); shift -= 2;
+			a <<= 1;
+			long e = (a << 1) + 1; // trial product
+			if (r >= e) {
+				r -= e;
+				a++;
+			}
+		}
+
+		return (Fix32) (int) a;
+		
+
+
+
 		/*
-		uint t, q, b, r;
-		r = (uint) x;
-		b = 0x40000000;
-		q = 0;
+		
+		uint r = (uint) x;
+		uint b = 0x40000000;
+		uint q = 0;
 		while (b > 0x40) {
-			t = q + b;
+			uint t = q + b;
 			if (r >= t) {
 				r -= t;
 				q = t + b; // equivalent to q += 2*b
@@ -429,7 +510,7 @@ public static partial class Fix32Ext {
 		q >>= 8;
 		return (Fix32) q;
 		*/
-
+		/*
 		long xx = (long) x << FRACTIONAL_BITS;
 		if (xx <= 1) return x;
 
@@ -447,7 +528,7 @@ public static partial class Fix32Ext {
 			g1 = (g1 + (xx / g1)) >> 1;
 		}
 		return (Fix32) (g0);
-
+		*/
 		/*
 		var xl = (int) x;
 
