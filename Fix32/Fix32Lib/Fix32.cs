@@ -459,33 +459,35 @@ public static partial class Fix32Ext {
 #if USE_DOUBLES
 		return Math.Sqrt(x.ToDouble()).ToFix32();
 #endif
-		if ((int) x < 0) {
+		if (x < 0) {
 			// We cannot represent infinities like Single and Double, and Sqrt is
 			// mathematically undefined for x < 0. So we just throw an exception.
 			throw new ArgumentOutOfRangeException("Negative value passed to Sqrt", "x");
 		}
 
 		// https://stackoverflow.com/questions/1100090/looking-for-an-efficient-integer-square-root-algorithm-for-arm-thumb2
-
-		long xx = (int) x;
-
-		long a = 0L; // accumulator
-		long r = 0L; // remainder
+		
+		int a = 0; // accumulator
+		int r = 0; // remainder
 
 		// Manually calculated constants (somehow) for precision Q18.14
 		const int SHIFT = 32;
 		const int ITERATIONS = (((SHIFT - 16) / 4) * 2) + 16; // 24
 
-		int shift = SHIFT;
+		int shift = SHIFT - 2;
+
+		int bottomHalf = 0;
 
 		for (int i = 0; i < ITERATIONS; i++) {
-			r = (r << 2) | (3L & (xx >> shift)); shift -= 2;
+			r = (r << 2) | bottomHalf;
 			a <<= 1;
-			long e = (a << 1) + 1; // trial product
+			int e = (a << 1) + 1; // trial product
 			if (r >= e) {
 				r -= e;
 				a++;
 			}
+			bottomHalf = 0x3 & ((int) x >> shift);
+			shift -= 2;
 		}
 
 		return (Fix32) (int) a;
