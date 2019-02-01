@@ -10,11 +10,17 @@ using System.Runtime.CompilerServices;
 public enum Fix32 : int {
 	MaxValue = Fix32Ext.MAX_VALUE,
 	MinValue = Fix32Ext.MIN_VALUE,
+	
 
+	Six = One * 6,
+	Five = One * 5,
+	Four = One * 4,
 	Three = One * 3,
 	Two = One * 2,
 	One = Fix32Ext.ONE,
-	Half = Fix32Ext.HALF,
+	Half = One / 2,
+	Third = One / 3,
+	Fourth = One / 4,
 	Zero = 0,
 	MinusOne = -One,
 	MinusTwo = -One * 2,
@@ -51,7 +57,7 @@ public static partial class Fix32Ext {
 
 	public const int NUM_BITS_MINUS_ONE = NUM_BITS - 1;
 	public const int ONE = 1 << FRACTIONAL_BITS;
-	public const int HALF = 1 << (FRACTIONAL_BITS - 1);
+	public const int HALF = ONE >> 1;
 	public const int FRACTIONAL_MASK = ONE - 1;
 	public const int INTEGER_MASK = ~FRACTIONAL_MASK;
 	public const int SIGN_MASK = unchecked((int) (1U << NUM_BITS_MINUS_ONE));
@@ -266,7 +272,7 @@ public static partial class Fix32Ext {
 	}
 
 	/// <summary>
-	/// Multiply. Saturates when overflows
+	/// Multiply. Saturates when overflows. May change to Fast in the future
 	/// </summary>
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public static Fix32 Mul(this Fix32 x, Fix32 y) {
@@ -291,7 +297,15 @@ public static partial class Fix32Ext {
 	}
 
 	/// <summary>
-	/// Divide. Saturates on overflow
+	/// Multiply. Saturates when overflows.
+	/// </summary>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static Fix32 MulSafe(this Fix32 x, Fix32 y) {
+		return Mul(x, y);
+	}
+
+	/// <summary>
+	/// Divide. Saturates on overflow. May change to Fast.
 	/// </summary>
 	public static Fix32 Div(this Fix32 x, Fix32 y) {
 #if USE_DOUBLES
@@ -309,7 +323,7 @@ public static partial class Fix32Ext {
 	}
 
 	/// <summary>
-	/// Divide. Overflows
+	/// Divide. Overflows.
 	/// </summary>
 	public static Fix32 DivFast(this Fix32 x, Fix32 y) {
 		if ((int) y == 0) {
@@ -319,7 +333,22 @@ public static partial class Fix32Ext {
 
 		return (Fix32) (int) (((long) x << FRACTIONAL_BITS) / (int) y);
 	}
-	
+
+	/// <summary>
+	/// Divide. Overflows. throws when <see cref="y"/> equals 0 instead of saturating.
+	/// </summary>
+	public static Fix32 DivFastest(this Fix32 x, Fix32 y) {
+		return (Fix32) (int) (((long) x << FRACTIONAL_BITS) / (int) y);
+	}
+
+	/// <summary>
+	/// Divide. Saturates on overflow.
+	/// </summary>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static Fix32 DivSafe(this Fix32 x, Fix32 y) {
+		return Div(x, y);
+	}
+
 	/// <summary>
 	/// Returns the base-2 logarithm of a specified number.
 	/// </summary>
@@ -634,6 +663,7 @@ public static partial class Fix32Ext {
 #if USE_DOUBLES
 		return Math.Cos(x.ToDouble()).ToFix32();
 #endif
+		// Don't use Fixed32.Cos, it gives an error
 		var rawAngle = (int) x + (x > 0 ? -PI - PI_OVER_2 : PI_OVER_2);
 		return ((Fix32) rawAngle).Sin();
 	}
@@ -688,6 +718,92 @@ public static partial class Fix32Ext {
 #endif
 		return (Fix32) Fixed32.TanFastest((int) x);
 	}
+
+	/// <summary>
+	/// Returns the tangent of x.
+	/// </summary>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static Fix32 Exp(this Fix32 x) {
+#if USE_DOUBLES
+		return Math.Exp(x.ToDouble()).ToFix32();
+#endif
+		return (Fix32) Fixed32.Exp((int) x);
+	}
+
+	/// <summary>
+	/// Returns the tangent of x.
+	/// </summary>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static Fix32 ExpFast(this Fix32 x) {
+		return (Fix32) Fixed32.ExpFast((int) x);
+	}
+
+	/// <summary>
+	/// Returns 1/x.
+	/// </summary>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static Fix32 Rcp(this Fix32 x) {
+#if USE_DOUBLES
+		return (1 / x.ToDouble()).ToFix32();
+#endif
+		return (Fix32) Fixed32.Rcp((int) x);
+	}
+
+	/// <summary>
+	/// Returns 1/x.
+	/// </summary>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static Fix32 RcpFast(this Fix32 x) {
+#if USE_DOUBLES
+		return (1 / x.ToDouble()).ToFix32();
+#endif
+		return (Fix32) Fixed32.RcpFast((int) x);
+	}
+
+	/// <summary>
+	/// Returns 1/x.
+	/// </summary>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static Fix32 RcpFastest(this Fix32 x) {
+#if USE_DOUBLES
+		return (1 / x.ToDouble()).ToFix32();
+#endif
+		return (Fix32) Fixed32.RcpFastest((int) x);
+	}
+
+	/// <summary>
+	/// Returns 1/sqrt(x).
+	/// </summary>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static Fix32 RSqrt(this Fix32 x) {
+#if USE_DOUBLES
+		return (1 / Math.Sqrt(x.ToDouble())).ToFix32();
+#endif
+		return (Fix32) Fixed32.RSqrt((int) x);
+	}
+
+	/// <summary>
+	/// Returns 1/sqrt(x).
+	/// </summary>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static Fix32 RSqrtFast(this Fix32 x) {
+#if USE_DOUBLES
+		return (1 / Math.Sqrt(x.ToDouble())).ToFix32();
+#endif
+		return (Fix32) Fixed32.RSqrtFast((int) x);
+	}
+
+	/// <summary>
+	/// Returns 1/sqrt(x).
+	/// </summary>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static Fix32 RSqrtFastest(this Fix32 x) {
+#if USE_DOUBLES
+		return (1 / Math.Sqrt(x.ToDouble())).ToFix32();
+#endif
+		return (Fix32) Fixed32.RSqrtFastest((int) x);
+	}
+
 
 	/// <summary>
 	/// Returns the arccos of of the specified number, calculated using Atan and Sqrt
@@ -880,6 +996,19 @@ public static partial class Fix32Ext {
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public static int ToInt(this Fix32 value) {
 		return (int) value / ONE;
+	}
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static Fix32 ToFix32(this decimal value) {
+		return (Fix32) (int) Clamp(value * ONE, MIN_VALUE, MAX_VALUE);
+	}
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static Fix32 ToFix32Fast(this decimal value) {
+		return (Fix32) (int) (value * ONE);
+	}
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public static decimal ToDecimal(this Fix32 value) {
+		return (decimal) value / ONE;
 	}
 
 

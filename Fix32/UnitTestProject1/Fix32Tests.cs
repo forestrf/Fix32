@@ -68,7 +68,7 @@ public class Fix32Tests {
 
 		const bool BENCHMARK = true;
 		if (BENCHMARK) {
-			for (int i = 0; i < 100000; i++)
+			for (int i = 0; i < 1000; i++)
 				TestCases.Add(r.Next());
 		}
 	}
