@@ -5,7 +5,7 @@ using System;
 using System.Runtime.CompilerServices;
 
 /// <summary>
-/// Represents a Q1.17.14 fixed-point number.
+/// Represents a Q1.15.16 fixed-point number.
 /// </summary>
 public enum Fix32 : int {
 	MaxValue = Fix32Ext.MAX_VALUE,
