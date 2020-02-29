@@ -1,7 +1,7 @@
-﻿//
+//
 // FixPointCS
 //
-// Copyright(c) 2018 Jere Sanisalo, Petri Kero
+// Copyright(c) 2018-2019 Jere Sanisalo, Petri Kero
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -23,7 +23,13 @@
 //
 
 // PREFIX
-// C#
+#if CPP
+#elif JAVA
+package fixpointcs;
+
+import java.lang.Integer;
+import java.lang.Double;
+#else // C#
 /* Coding style:
  * 
  * In order to keep the transpiled C++/Java code working, here are some generic
@@ -48,15 +54,21 @@
 using System;
 using System.Runtime.CompilerServices;
 using System.Diagnostics;
+#endif
 
+#if !TRANSPILE
 namespace FixPointCS
 {
-	
+#endif
+
+#if CPP
+#else
     /// <summary>
     /// Direct fixed point (signed 16.16) functions.
     /// </summary>
     public static class Fixed32
     {
+#endif
         public const int Shift = 16;
         public const int FractionMask = (1 << Shift) - 1;
         public const int IntegerMask = ~FractionMask;
@@ -85,6 +97,7 @@ namespace FixPointCS
         /// <summary>
         /// Converts an integer to a fixed-point value.
         /// </summary>
+        [MethodImpl(FixedUtil.AggressiveInlining)]
         public static int FromInt(int v)
         {
             return (int)v << Shift;
@@ -93,6 +106,7 @@ namespace FixPointCS
         /// <summary>
         /// Converts a double to a fixed-point value.
         /// </summary>
+        [MethodImpl(FixedUtil.AggressiveInlining)]
         public static int FromDouble(double v)
         {
             return (int)(v * 65536.0);
@@ -101,6 +115,7 @@ namespace FixPointCS
         /// <summary>
         /// Converts a float to a fixed-point value.
         /// </summary>
+        [MethodImpl(FixedUtil.AggressiveInlining)]
         public static int FromFloat(float v)
         {
             return (int)(v * 65536.0f);
@@ -109,6 +124,7 @@ namespace FixPointCS
         /// <summary>
         /// Converts a fixed-point value into an integer by rounding it up to nearest integer.
         /// </summary>
+        [MethodImpl(FixedUtil.AggressiveInlining)]
         public static int CeilToInt(int v)
         {
             return (int)((v + (One - 1)) >> Shift);
@@ -117,6 +133,7 @@ namespace FixPointCS
         /// <summary>
         /// Converts a fixed-point value into an integer by rounding it down to nearest integer.
         /// </summary>
+        [MethodImpl(FixedUtil.AggressiveInlining)]
         public static int FloorToInt(int v)
         {
             return (int)(v >> Shift);
@@ -125,6 +142,7 @@ namespace FixPointCS
         /// <summary>
         /// Converts a fixed-point value into an integer by rounding it to nearest integer.
         /// </summary>
+        [MethodImpl(FixedUtil.AggressiveInlining)]
         public static int RoundToInt(int v)
         {
             return (int)((v + Half) >> Shift);
@@ -133,6 +151,7 @@ namespace FixPointCS
         /// <summary>
         /// Converts a fixed-point value into a double.
         /// </summary>
+        [MethodImpl(FixedUtil.AggressiveInlining)]
         public static double ToDouble(int v)
         {
             return (double)v * (1.0 / 65536.0);
@@ -141,6 +160,7 @@ namespace FixPointCS
         /// <summary>
         /// Converts a FP value into a float.
         /// </summary>
+        [MethodImpl(FixedUtil.AggressiveInlining)]
         public static float ToFloat(int v)
         {
             return (float)v * (1.0f / 65536.0f);
@@ -149,10 +169,18 @@ namespace FixPointCS
         /// <summary>
         /// Converts the value to a human readable string.
         /// </summary>
+#if CPP
+#elif JAVA
+        public static String ToString(int v)
+        {
+            return Double.toString(ToDouble(v));
+        }
+#else
         public static string ToString(int v)
         {
             return ToDouble(v).ToString();
         }
+#endif
 
         /// <summary>
         /// Returns the absolute (positive) value of x.
@@ -161,8 +189,8 @@ namespace FixPointCS
         public static int Abs(int x)
         {
             // \note fails with MinValue
-            // \note for some reason this is twice as fast as (x > 0) ? x : -x
-            return (x < 0) ? -x : x;
+            int mask = x >> 31;
+            return (x + mask) ^ mask;
         }
 
         /// <summary>
@@ -171,12 +199,13 @@ namespace FixPointCS
         [MethodImpl(FixedUtil.AggressiveInlining)]
         public static int Nabs(int x)
         {
-            return (x > 0) ? -x : x;
+            return -Abs(x);
         }
 
         /// <summary>
         /// Round up to nearest integer.
         /// </summary>
+        [MethodImpl(FixedUtil.AggressiveInlining)]
         public static int Ceil(int x)
         {
             return (x + FractionMask) & IntegerMask;
@@ -185,6 +214,7 @@ namespace FixPointCS
         /// <summary>
         /// Round down to nearest integer.
         /// </summary>
+        [MethodImpl(FixedUtil.AggressiveInlining)]
         public static int Floor(int x)
         {
             return x & IntegerMask;
@@ -193,6 +223,7 @@ namespace FixPointCS
         /// <summary>
         /// Round to nearest integer.
         /// </summary>
+        [MethodImpl(FixedUtil.AggressiveInlining)]
         public static int Round(int x)
         {
             return (x + Half) & IntegerMask;
@@ -201,6 +232,7 @@ namespace FixPointCS
         /// <summary>
         /// Returns the fractional part of x. Equal to 'x - floor(x)'.
         /// </summary>
+        [MethodImpl(FixedUtil.AggressiveInlining)]
         public static int Fract(int x)
         {
             return x & FractionMask;
@@ -209,6 +241,7 @@ namespace FixPointCS
         /// <summary>
         /// Returns the minimum of the two values.
         /// </summary>
+        [MethodImpl(FixedUtil.AggressiveInlining)]
         public static int Min(int a, int b)
         {
             return (a < b) ? a : b;
@@ -217,18 +250,29 @@ namespace FixPointCS
         /// <summary>
         /// Returns the maximum of the two values.
         /// </summary>
+        [MethodImpl(FixedUtil.AggressiveInlining)]
         public static int Max(int a, int b)
         {
             return (a > b) ? a : b;
         }
 
         /// <summary>
+        /// Returns the value clamped between min and max.
+        /// </summary>
+        [MethodImpl(FixedUtil.AggressiveInlining)]
+        public static int Clamp(int a, int min, int max)
+        {
+            return (a > max) ? max : (a < min) ? min : a;
+        }
+
+        /// <summary>
         /// Returns the sign of the value (-1 if negative, 0 if zero, 1 if positive).
         /// </summary>
+        [MethodImpl(FixedUtil.AggressiveInlining)]
         public static int Sign(int x)
         {
-            if (x == 0) return 0;
-            return (x < 0) ? -1 : 1;
+            // https://stackoverflow.com/questions/14579920/fast-sign-of-integer-in-c/14612418#14612418
+            return ((x >> 31) | (int)(((uint)-x) >> 31));
         }
 
         /// <summary>
@@ -252,11 +296,29 @@ namespace FixPointCS
         /// <summary>
         /// Multiplies two FP values together.
         /// </summary>
+        [MethodImpl(FixedUtil.AggressiveInlining)]
         public static int Mul(int a, int b)
         {
             return (int)(((long)a * (long)b) >> Shift);
         }
 
+        /// <summary>
+        /// Linearly interpolate from a to b by t.
+        /// </summary>
+        [MethodImpl(FixedUtil.AggressiveInlining)]
+        public static int Lerp(int a, int b, int t)
+        {
+            long ta = (long)a * (One - (long)t);
+            long tb = (long)b * (long)t;
+            return (int)((ta + tb) >> Shift);
+        }
+
+#if JAVA
+        private static int Nlz(int x)
+        {
+            return Integer.numberOfLeadingZeros(x);
+        }
+#else
         [MethodImpl(FixedUtil.AggressiveInlining)]
         private static int Nlz(uint x)
         {
@@ -269,6 +331,7 @@ namespace FixPointCS
             if (x == 0) return 32;
             return n;
         }
+#endif
 
         /// <summary>
         /// Divides two FP values.
@@ -362,8 +425,26 @@ namespace FixPointCS
         {
             // Adapted from https://github.com/chmike/fpsqrt
             if (a < 0)
-                return -1;
-			
+                return 0;
+
+#if JAVA
+            int r = a;
+            int b = 0x40000000;
+            int q = 0;
+            while (b > 0x40)
+            {
+                int t = q + b;
+                if (Integer.compareUnsigned(r, t) >= 0)
+                {
+                    r -= t;
+                    q = t + b;
+                }
+                r <<= 1;
+                b >>= 1;
+            }
+            q >>>= 8;
+            return q;
+#else
             uint r = (uint)a;
             uint b = 0x40000000;
             uint q = 0;
@@ -380,6 +461,7 @@ namespace FixPointCS
             }
             q >>= 8;
             return (int)q;
+#endif
         }
 
         public static int Sqrt(int x)
@@ -936,16 +1018,19 @@ namespace FixPointCS
             return UnitSinFastest(z) >> 14;
         }
 
+        [MethodImpl(FixedUtil.AggressiveInlining)]
         public static int Cos(int x)
         {
             return Sin(x + PiHalf);
         }
 
+        [MethodImpl(FixedUtil.AggressiveInlining)]
         public static int CosFast(int x)
         {
             return SinFast(x + PiHalf);
         }
 
+        [MethodImpl(FixedUtil.AggressiveInlining)]
         public static int CosFastest(int x)
         {
             return SinFastest(x + PiHalf);
@@ -1131,7 +1216,7 @@ namespace FixPointCS
                 return ((y > 0) ? PiHalf : -PiHalf) - angle;
             }
         }
-		/*
+
         public static int Asin(int x)
         {
             // Return 0 for invalid values
@@ -1167,7 +1252,7 @@ namespace FixPointCS
             long y = Fixed64.SqrtFastest(xx);
             return (int)(Fixed64.Atan2Fastest((long)x << 16, y) >> 16);
         }
-		
+
         public static int Acos(int x)
         {
             // Return 0 for invalid values
@@ -1203,22 +1288,31 @@ namespace FixPointCS
             long y = Fixed64.SqrtFastest(xx);
             return (int)(Fixed64.Atan2Fastest(y, (long)x << 16) >> 16);
         }
-		*/
+
+        [MethodImpl(FixedUtil.AggressiveInlining)]
         public static int Atan(int x)
         {
             return Atan2(x, One);
         }
 
+        [MethodImpl(FixedUtil.AggressiveInlining)]
         public static int AtanFast(int x)
         {
             return Atan2Fast(x, One);
         }
 
+        [MethodImpl(FixedUtil.AggressiveInlining)]
         public static int AtanFastest(int x)
         {
             return Atan2Fastest(x, One);
         }
+#if CPP
+#else
     } // Fixed32
+#endif
+
+#if !TRANSPILE
 } // namespace
+#endif
 
 // SUFFIX

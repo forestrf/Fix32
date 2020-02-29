@@ -1,7 +1,7 @@
 ﻿//
 // FixPointCS
 //
-// Copyright(c) 2018 Jere Sanisalo, Petri Kero
+// Copyright(c) 2018-2019 Jere Sanisalo, Petri Kero
 // 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -28,7 +28,6 @@ using System.Linq;
 using System.Diagnostics;
 using System.Collections.Generic;
 
-using FixPointCS;
 using FixMath;
 
 namespace FixPointCSTest
@@ -192,12 +191,33 @@ namespace FixPointCSTest
 
         public static int GetTypePrecisionBits(Type type)
         {
-            if (type == typeof(F32))
+            if (type == typeof(F64))
+                return 32;
+            else if (type == typeof(F32))
                 return 16;
             else if (type == typeof(int))
                 return 0;
             else
                 throw new InvalidOperationException("GetTypePrecisionBits(): Unknown type: " + type);
+        }
+
+        public static Operation F64_F64(string funcName, Action<int, F64[], F64[]> execute)
+        {
+            return new Operation(funcName, new ValueBoundsF64(), new[] { typeof(F64) }, new[] { typeof(F64) },
+                (int count, Array[] inputs, Array[] outputs) => { execute(count, (F64[])inputs[0], (F64[])outputs[0]); }
+            );
+        }
+
+        public static Operation F64_Int(string funcName, Action<int, F64[], int[]> execute)
+        {
+            return new Operation(funcName, new ValueBoundsF64(), new[] { typeof(F64) }, new[] { typeof(int) },
+                (int count, Array[] inputs, Array[] outputs) => { execute(count, (F64[])inputs[0], (int[])outputs[0]); }
+            );
+        }
+
+        public static Operation F64_F64_F64(string funcName, Action<int, F64[], F64[], F64[]> execute)
+        {
+            return new Operation(funcName, new ValueBoundsF64(), new[] { typeof(F64), typeof(F64) }, new[] { typeof(F64) }, (int count, Array[] inputs, Array[] outputs) => { execute(count, (F64[])inputs[0], (F64[])inputs[1], (F64[])outputs[0]); });
         }
 
         public static Operation F32_F32(string funcName, Action<int, F32[], F32[]> execute)
@@ -239,9 +259,11 @@ namespace FixPointCSTest
             {
                 case TargetLanguage.Java:
                     if (fromType == typeof(F32))
-                        return String.Join(", ", ((F32[])values).Select(v => v.raw.ToString()));
+                        return String.Join(", ", ((F32[])values).Select(v => v.Raw.ToString()));
                     else if (fromType == typeof(int))
                         return String.Join(", ", ((int[])values).Select(v => v.ToString()));
+                    else if (fromType == typeof(F64))
+                        return String.Join(", ", ((F64[])values).Select(v => v.Raw.ToString() + longPostfix));
                     else if (fromType == typeof(long))
                         return String.Join(", ", ((long[])values).Select(v => v.ToString() + longPostfix));
                     else
@@ -249,9 +271,11 @@ namespace FixPointCSTest
 
                 case TargetLanguage.Cpp:
                     if (fromType == typeof(F32))
-                        return String.Join(", ", ((F32[])values).Select(v => "(int32_t)0x" + v.raw.ToString("X")));
+                        return String.Join(", ", ((F32[])values).Select(v => "(int32_t)0x" + v.Raw.ToString("X")));
                     else if (fromType == typeof(int))
                         return String.Join(", ", ((int[])values).Select(v => "(int32_t)0x" + v.ToString("X")));
+                    else if (fromType == typeof(F64))
+                        return String.Join(", ", ((F64[])values).Select(v => "(int64_t)0x" + v.Raw.ToString("X") + longPostfix));
                     else if (fromType == typeof(long))
                         return String.Join(", ", ((long[])values).Select(v => "(int64_t)0x" + v.ToString("X") + longPostfix));
                     else
@@ -267,7 +291,13 @@ namespace FixPointCSTest
             Type fromType = values.GetType().GetElementType();
             double[] output = new double[values.Length];
 
-            if (fromType == typeof(F32))
+            if (fromType == typeof(F64))
+            {
+                F64[] input = (F64[])values;
+                for (int i = 0; i < values.Length; i++)
+                    output[i] = input[i].Double;
+            }
+            else if (fromType == typeof(F32))
             {
                 F32[] input = (F32[])values;
                 for (int i = 0; i < values.Length; i++)
@@ -448,7 +478,9 @@ namespace FixPointCSTest
             {
                 Type type = opImpl.InputTypes[ndx];
 
-                if (type == typeof(F32))
+                if (type == typeof(F64))
+                    result[ndx] = new F64[count];
+                else if (type == typeof(F32))
                     result[ndx] = new F32[count];
                 else
                     throw new InvalidOperationException("Unknown input data type: " + type);
@@ -466,7 +498,12 @@ namespace FixPointCSTest
                 ValueGenerator generator = inputGenerator.generators[ndx];
                 Type type = opImpl.InputTypes[ndx];
 
-                if (type == typeof(F32))
+                if (type == typeof(F64))
+                {
+                    F64[] tmp = generator(rnd, count).Select(d => F64.FromDouble(d)).ToArray();
+                    Array.Copy(tmp, 0, result[ndx], offset, count);
+                }
+                else if (type == typeof(F32))
                 {
                     F32[] tmp = generator(rnd, count).Select(d => F32.FromDouble(d)).ToArray();
                     Array.Copy(tmp, 0, result[ndx], offset, count);
@@ -518,7 +555,13 @@ namespace FixPointCSTest
                 return values;
 
             // Conversions
-            if (fromType == typeof(F32))
+            if (fromType == typeof(F64))
+            {
+                F64[] inputs = (F64[])values;
+                if (toType == typeof(Double))
+                    return inputs.Select(a => a.Double).ToArray();
+            }
+            else if (fromType == typeof(F32))
             {
                 F32[] inputs = (F32[])values;
                 if (toType == typeof(Double))
@@ -600,7 +643,9 @@ namespace FixPointCSTest
             switch (language)
             {
                 case TargetLanguage.Java:
-                    if (type == typeof(F32))
+                    if (type == typeof(F64))
+                        return "long";
+                    else if (type == typeof(F32))
                         return "int";
                     else if (type == typeof(long))
                         return "long";
@@ -610,7 +655,9 @@ namespace FixPointCSTest
                         throw new InvalidOperationException("Invalid type: " + type);
 
                 case TargetLanguage.Cpp:
-                    if (type == typeof(F32))
+                    if (type == typeof(F64))
+                        return "int64_t";
+                    else if (type == typeof(F32))
                         return "int32_t";
                     else if (type == typeof(long))
                         return "int64_t";
@@ -812,6 +859,7 @@ namespace FixPointCSTest
                 (double i0) => { return i0; },
                 AbsoluteUnaryErrorEvaluator(),
                 Operation.Multi(
+                    Operation.F64_F64("Fixed64.Nop", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = i0[i]; } }),
                     Operation.F32_F32("Fixed32.Nop", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = i0[i]; } })
                 ),
                 bounds => new[] {
@@ -823,6 +871,7 @@ namespace FixPointCSTest
                 (double i0, double i1) => { return i0 + i1; },
                 AbsoluteBinaryErrorEvaluator(),
                 Operation.Multi(
+                    Operation.F64_F64_F64("Fixed64.Add", (int n, F64[] i0, F64[] i1, F64[] o) => { for (int i=0; i<n; i++) { o[i] = i0[i] + i1[i]; } }),
                     Operation.F32_F32_F32("Fixed32.Add", (int n, F32[] i0, F32[] i1, F32[] o) => { for (int i=0; i<n; i++) { o[i] = i0[i] + i1[i]; } })
                 ),
                 bounds => new[] {
@@ -836,6 +885,7 @@ namespace FixPointCSTest
                 (double i0, double i1) => { return i0 - i1; },
                 AbsoluteBinaryErrorEvaluator(),
                 Operation.Multi(
+                    Operation.F64_F64_F64("Fixed64.Sub", (int n, F64[] i0, F64[] i1, F64[] o) => { for (int i=0; i<n; i++) { o[i] = i0[i] - i1[i]; } }),
                     Operation.F32_F32_F32("Fixed32.Sub", (int n, F32[] i0, F32[] i1, F32[] o) => { for (int i=0; i<n; i++) { o[i] = i0[i] - i1[i]; } })
                 ),
                 bounds => new[] {
@@ -849,6 +899,7 @@ namespace FixPointCSTest
                 (double i0, double i1) => { return i0 * i1; },
                 RelativeBinaryErrorEvaluator(),
                 Operation.Multi(
+                    Operation.F64_F64_F64("Fixed64.Mul", (int n, F64[] i0, F64[] i1, F64[] o) => { for (int i=0; i<n; i++) { o[i] = i0[i] * i1[i]; } }),
                     Operation.F32_F32_F32("Fixed32.Mul", (int n, F32[] i0, F32[] i1, F32[] o) => { for (int i=0; i<n; i++) { o[i] = i0[i] * i1[i]; } })
                 ),
                 bounds => new[] {
@@ -862,6 +913,7 @@ namespace FixPointCSTest
                 (double i0, double i1) => { return i0 / i1; },
                 DivisionErrorEvaluator(),
                 Operation.Multi(
+                    Operation.F64_F64_F64("Fixed64.DivPrecise", (int n, F64[] i0, F64[] i1, F64[] o) => { for (int i=0; i<n; i++) { o[i] = i0[i] / i1[i]; } }),
                     Operation.F32_F32_F32("Fixed32.DivPrecise", (int n, F32[] i0, F32[] i1, F32[] o) => { for (int i=0; i<n; i++) { o[i] = i0[i] / i1[i]; } })
                 ),
                 bounds => new[] {
@@ -876,6 +928,7 @@ namespace FixPointCSTest
                 (double i0, double i1) => { return i0 % i1; },
                 DivisionErrorEvaluator(),
                 Operation.Multi(
+                    Operation.F64_F64_F64("Fixed64.Mod", (int n, F64[] i0, F64[] i1, F64[] o) => { for (int i=0; i<n; i++) { o[i] = i0[i] % i1[i]; } }),
                     Operation.F32_F32_F32("Fixed32.Mod", (int n, F32[] i0, F32[] i1, F32[] o) => { for (int i=0; i<n; i++) { o[i] = i0[i] % i1[i]; } })
                 ),
                 bounds => new[] {
@@ -891,6 +944,7 @@ namespace FixPointCSTest
                 (double i0, double i1) => { return Math.Min(i0, i1); },
                 AbsoluteBinaryErrorEvaluator(),
                 Operation.Multi(
+                    Operation.F64_F64_F64("Fixed64.Min", (int n, F64[] i0, F64[] i1, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.Min(i0[i], i1[i]); } }),
                     Operation.F32_F32_F32("Fixed32.Min", (int n, F32[] i0, F32[] i1, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.Min(i0[i], i1[i]); } })
                 ),
                 bounds => new[] {
@@ -903,6 +957,7 @@ namespace FixPointCSTest
                 (double i0, double i1) => { return Math.Max(i0, i1); },
                 AbsoluteBinaryErrorEvaluator(),
                 Operation.Multi(
+                    Operation.F64_F64_F64("Fixed64.Max", (int n, F64[] i0, F64[] i1, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.Max(i0[i], i1[i]); } }),
                     Operation.F32_F32_F32("Fixed32.Max", (int n, F32[] i0, F32[] i1, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.Max(i0[i], i1[i]); } })
                 ),
                 bounds => new[] {
@@ -912,10 +967,26 @@ namespace FixPointCSTest
                 }
             ),
 
+            // \todo [petri] implement clamp
+            //new TernaryOpFamily(
+            //    (double i0, double i1, double i2) => { return Math.Clamp(i0, i1, i2); },
+            //    AbsoluteBinaryErrorEvaluator(),
+            //    Operation.Multi(
+            //        Operation.F64_F64_F64_F64("Fixed64.Clamp", (int n, F64[] i0, F64[] i1, F64[] i2, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.Clamp(i0[i], i1[i], i2[i]); } }),
+            //        Operation.F32_F32_F32_F32("Fixed32.Clamp", (int n, F32[] i0, F32[] i1, F32[] i2, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.Clamp(i0[i], i1[i], i2[i]); } })
+            //    ),
+            //    bounds => new[] {
+            //        InputGenerator.Ternary(Input.Uniform(-1.0, 1.0), Input.Uniform(-1.0, 1.0), Input.Uniform(-1.0, 1.0)),
+            //        InputGenerator.Ternary(Input.Uniform(-1e5, 1e5), Input.Uniform(-1e5, 1e5), Input.Uniform(-1e5, 1e5)),
+            //        InputGenerator.Ternary(Input.Uniform(bounds.InputNegMax, bounds.InputPosMax), Input.Uniform(bounds.InputNegMax, bounds.InputPosMax), Input.Uniform(bounds.InputNegMax, bounds.InputPosMax)),
+            //    }
+            //),
+
             new UnaryOpFamily(
                 (double i0) => { return Math.Ceiling(i0); },
                 AbsoluteUnaryErrorEvaluator(),
                 Operation.Multi(
+                    Operation.F64_F64("Fixed64.Ceil", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.Ceil(i0[i]); } }),
                     Operation.F32_F32("Fixed32.Ceil", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.Ceil(i0[i]); } })
                 ),
                 bounds => new[] {
@@ -929,6 +1000,7 @@ namespace FixPointCSTest
                 (double i0) => { return Math.Floor(i0); },
                 AbsoluteUnaryErrorEvaluator(),
                 Operation.Multi(
+                    Operation.F64_F64("Fixed64.Floor", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.Floor(i0[i]); } }),
                     Operation.F32_F32("Fixed32.Floor", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.Floor(i0[i]); } })
                 ),
                 bounds => new[] {
@@ -942,6 +1014,7 @@ namespace FixPointCSTest
                 (double i0) => { return Math.Floor(i0 + 0.5); },
                 AbsoluteUnaryErrorEvaluator(),
                 Operation.Multi(
+                    Operation.F64_F64("Fixed64.Round", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.Round(i0[i]); } }),
                     Operation.F32_F32("Fixed32.Round", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.Round(i0[i]); } })
                 ),
                 bounds => new[] {
@@ -955,6 +1028,7 @@ namespace FixPointCSTest
                 (double i0) => { return i0 - Math.Floor(i0); },
                 AbsoluteUnaryErrorEvaluator(),
                 Operation.Multi(
+                    Operation.F64_F64("Fixed64.Fract", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.Fract(i0[i]); } }),
                     Operation.F32_F32("Fixed32.Fract", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.Fract(i0[i]); } })
                 ),
                 bounds => new[] {
@@ -968,6 +1042,7 @@ namespace FixPointCSTest
                 (double i0) => { return Math.Ceiling(i0); },
                 AbsoluteUnaryErrorEvaluator(),
                 Operation.Multi(
+                    Operation.F64_Int("Fixed64.CeilToInt", (int n, F64[] i0, int[] o) => { for (int i=0; i<n; i++) { o[i] = F64.CeilToInt(i0[i]); } }),
                     Operation.F32_Int("Fixed32.CeilToInt", (int n, F32[] i0, int[] o) => { for (int i=0; i<n; i++) { o[i] = F32.CeilToInt(i0[i]); } })
                 ),
                 bounds => new[] {
@@ -981,6 +1056,7 @@ namespace FixPointCSTest
                 (double i0) => { return Math.Floor(i0); },
                 AbsoluteUnaryErrorEvaluator(),
                 Operation.Multi(
+                    Operation.F64_Int("Fixed64.FloorToInt", (int n, F64[] i0, int[] o) => { for (int i=0; i<n; i++) { o[i] = F64.FloorToInt(i0[i]); } }),
                     Operation.F32_Int("Fixed32.FloorToInt", (int n, F32[] i0, int[] o) => { for (int i=0; i<n; i++) { o[i] = F32.FloorToInt(i0[i]); } })
                 ),
                 bounds => new[] {
@@ -994,6 +1070,7 @@ namespace FixPointCSTest
                 (double i0) => { return Math.Floor(i0 + 0.5); },
                 AbsoluteUnaryErrorEvaluator(),
                 Operation.Multi(
+                    Operation.F64_Int("Fixed64.RoundToInt", (int n, F64[] i0, int[] o) => { for (int i=0; i<n; i++) { o[i] = F64.RoundToInt(i0[i]); } }),
                     Operation.F32_Int("Fixed32.RoundToInt", (int n, F32[] i0, int[] o) => { for (int i=0; i<n; i++) { o[i] = F32.RoundToInt(i0[i]); } })
                 ),
                 bounds => new[] {
@@ -1007,6 +1084,7 @@ namespace FixPointCSTest
                 (double i0) => { return Math.Abs(i0); },
                 AbsoluteUnaryErrorEvaluator(),
                 Operation.Multi(
+                    Operation.F64_F64("Fixed64.Abs", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.Abs(i0[i]); } }),
                     Operation.F32_F32("Fixed32.Abs", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.Abs(i0[i]); } })
                 ),
                 bounds => new[] {
@@ -1020,6 +1098,7 @@ namespace FixPointCSTest
                 (double i0) => { return -Math.Abs(i0); },
                 AbsoluteUnaryErrorEvaluator(),
                 Operation.Multi(
+                    Operation.F64_F64("Fixed64.Nabs", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.Nabs(i0[i]); } }),
                     Operation.F32_F32("Fixed32.Nabs", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.Nabs(i0[i]); } })
                 ),
                 bounds => new[] {
@@ -1033,6 +1112,9 @@ namespace FixPointCSTest
                 (double i0) => { return 1.0 / i0; },
                 RelativeUnaryErrorEvaluator(),
                 new[] {
+                    Operation.F64_F64("Fixed64.Rcp", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.Rcp(i0[i]); } }),
+                    Operation.F64_F64("Fixed64.RcpFast", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.RcpFast(i0[i]); } }),
+                    Operation.F64_F64("Fixed64.RcpFastest", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.RcpFastest(i0[i]); } }),
                     Operation.F32_F32("Fixed32.Rcp", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.Rcp(i0[i]); } }),
                     Operation.F32_F32("Fixed32.RcpFast", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.RcpFast(i0[i]); } }),
                     Operation.F32_F32("Fixed32.RcpFastest", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.RcpFastest(i0[i]); } }),
@@ -1046,6 +1128,9 @@ namespace FixPointCSTest
                 (double i0, double i1) => { return i0 / i1; },
                 DivisionErrorEvaluator(),
                 Operation.Multi(
+                    Operation.F64_F64_F64("Fixed64.Div", (int n, F64[] i0, F64[] i1, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.Div(i0[i], i1[i]); } }),
+                    Operation.F64_F64_F64("Fixed64.DivFast", (int n, F64[] i0, F64[] i1, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.DivFast(i0[i], i1[i]); } }),
+                    Operation.F64_F64_F64("Fixed64.DivFastest", (int n, F64[] i0, F64[] i1, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.DivFastest(i0[i], i1[i]); } }),
                     Operation.F32_F32_F32("Fixed32.Div", (int n, F32[] i0, F32[] i1, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.Div(i0[i], i1[i]); } }),
                     Operation.F32_F32_F32("Fixed32.DivFast", (int n, F32[] i0, F32[] i1, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.DivFast(i0[i], i1[i]); } }),
                     Operation.F32_F32_F32("Fixed32.DivFastest", (int n, F32[] i0, F32[] i1, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.DivFastest(i0[i], i1[i]); } })
@@ -1062,6 +1147,10 @@ namespace FixPointCSTest
                 (double i0) => { return Math.Sqrt(i0); },
                 RelativeUnaryErrorEvaluator(),
                 new[] {
+                    Operation.F64_F64("Fixed64.SqrtPrecise", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.SqrtPrecise(i0[i]); } }),
+                    Operation.F64_F64("Fixed64.Sqrt", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.Sqrt(i0[i]); } }),
+                    Operation.F64_F64("Fixed64.SqrtFast", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.SqrtFast(i0[i]); } }),
+                    Operation.F64_F64("Fixed64.SqrtFastest", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.SqrtFastest(i0[i]); } }),
                     Operation.F32_F32("Fixed32.SqrtPrecise", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.SqrtPrecise(i0[i]); } }),
                     Operation.F32_F32("Fixed32.Sqrt", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.Sqrt(i0[i]); } }),
                     Operation.F32_F32("Fixed32.SqrtFast", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.SqrtFast(i0[i]); } }),
@@ -1076,6 +1165,9 @@ namespace FixPointCSTest
                 (double i0) => { return 1.0 / Math.Sqrt(i0); },
                 RelativeUnaryErrorEvaluator(),
                 Operation.Multi(
+                    Operation.F64_F64("Fixed64.RSqrt", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.RSqrt(i0[i]); } }),
+                    Operation.F64_F64("Fixed64.RSqrtFast", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.RSqrtFast(i0[i]); } }),
+                    Operation.F64_F64("Fixed64.RSqrtFastest", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.RSqrtFastest(i0[i]); } }),
                     Operation.F32_F32("Fixed32.RSqrt", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.RSqrt(i0[i]); } }),
                     Operation.F32_F32("Fixed32.RSqrtFast", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.RSqrtFast(i0[i]); } }),
                     Operation.F32_F32("Fixed32.RSqrtFastest", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.RSqrtFastest(i0[i]); } })
@@ -1089,6 +1181,9 @@ namespace FixPointCSTest
                 (double i0) => { return Math.Exp(i0); },
                 RelativeUnaryErrorEvaluator(),
                 Operation.Multi(
+                    Operation.F64_F64("Fixed64.Exp", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.Exp(i0[i]); } }),
+                    Operation.F64_F64("Fixed64.ExpFast", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.ExpFast(i0[i]); } }),
+                    Operation.F64_F64("Fixed64.ExpFastest", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.ExpFastest(i0[i]); } }),
                     Operation.F32_F32("Fixed32.Exp", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.Exp(i0[i]); } }),
                     Operation.F32_F32("Fixed32.ExpFast", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.ExpFast(i0[i]); } }),
                     Operation.F32_F32("Fixed32.ExpFastest", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.ExpFastest(i0[i]); } })
@@ -1104,6 +1199,9 @@ namespace FixPointCSTest
                 (double i0) => { return Math.Pow(2.0, i0); },
                 RelativeUnaryErrorEvaluator(),
                 new[] {
+                    Operation.F64_F64("Fixed64.Exp2", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.Exp2(i0[i]); } }),
+                    Operation.F64_F64("Fixed64.Exp2Fast", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.Exp2Fast(i0[i]); } }),
+                    Operation.F64_F64("Fixed64.Exp2Fastest", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.Exp2Fastest(i0[i]); } }),
                     Operation.F32_F32("Fixed32.Exp2", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.Exp2(i0[i]); } }),
                     Operation.F32_F32("Fixed32.Exp2Fast", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.Exp2Fast(i0[i]); } }),
                     Operation.F32_F32("Fixed32.Exp2Fastest", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.Exp2Fastest(i0[i]); } }),
@@ -1119,6 +1217,9 @@ namespace FixPointCSTest
                 (double i0) => { return Math.Log(i0); },
                 RelativeUnaryErrorEvaluator(16.0),
                 new[] {
+                    Operation.F64_F64("Fixed64.Log", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.Log(i0[i]); } }),
+                    Operation.F64_F64("Fixed64.LogFast", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.LogFast(i0[i]); } }),
+                    Operation.F64_F64("Fixed64.LogFastest", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.LogFastest(i0[i]); } }),
                     Operation.F32_F32("Fixed32.Log", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.Log(i0[i]); } }),
                     Operation.F32_F32("Fixed32.LogFast", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.LogFast(i0[i]); } }),
                     Operation.F32_F32("Fixed32.LogFastest", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.LogFastest(i0[i]); } }),
@@ -1133,6 +1234,9 @@ namespace FixPointCSTest
                 (double i0) => { return Math.Log(i0, 2.0); },
                 RelativeUnaryErrorEvaluator(16.0),
                 new[] {
+                    Operation.F64_F64("Fixed64.Log2", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.Log2(i0[i]); } }),
+                    Operation.F64_F64("Fixed64.Log2Fast", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.Log2Fast(i0[i]); } }),
+                    Operation.F64_F64("Fixed64.Log2Fastest", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.Log2Fastest(i0[i]); } }),
                     Operation.F32_F32("Fixed32.Log2", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.Log2(i0[i]); } }),
                     Operation.F32_F32("Fixed32.Log2Fast", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.Log2Fast(i0[i]); } }),
                     Operation.F32_F32("Fixed32.Log2Fastest", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.Log2Fastest(i0[i]); } }),
@@ -1147,6 +1251,9 @@ namespace FixPointCSTest
                 (double i0, double i1) => { return Math.Pow(i0, i1); },
                 RelativeBinaryErrorEvaluator(),
                 new[] {
+                    Operation.F64_F64_F64("Fixed64.Pow", (int n, F64[] i0, F64[] i1, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.Pow(i0[i], i1[i]); } }),
+                    Operation.F64_F64_F64("Fixed64.PowFast", (int n, F64[] i0, F64[] i1, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.PowFast(i0[i], i1[i]); } }),
+                    Operation.F64_F64_F64("Fixed64.PowFastest", (int n, F64[] i0, F64[] i1, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.PowFastest(i0[i], i1[i]); } }),
                     Operation.F32_F32_F32("Fixed32.Pow", (int n, F32[] i0, F32[] i1, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.Pow(i0[i], i1[i]); } }),
                     Operation.F32_F32_F32("Fixed32.PowFast", (int n, F32[] i0, F32[] i1, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.PowFast(i0[i], i1[i]); } }),
                     Operation.F32_F32_F32("Fixed32.PowFastest", (int n, F32[] i0, F32[] i1, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.PowFastest(i0[i], i1[i]); } }),
@@ -1161,6 +1268,9 @@ namespace FixPointCSTest
                 (double i0) => { return Math.Sin(i0); },
                 SinCosErrorEvaluator(),
                 new[] {
+                    Operation.F64_F64("Fixed64.Sin", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.Sin(i0[i]); } }),
+                    Operation.F64_F64("Fixed64.SinFast", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.SinFast(i0[i]); } }),
+                    Operation.F64_F64("Fixed64.SinFastest", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.SinFastest(i0[i]); } }),
                     Operation.F32_F32("Fixed32.Sin", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.Sin(i0[i]); } }),
                     Operation.F32_F32("Fixed32.SinFast", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.SinFast(i0[i]); } }),
                     Operation.F32_F32("Fixed32.SinFastest", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.SinFastest(i0[i]); } }),
@@ -1175,6 +1285,9 @@ namespace FixPointCSTest
                 (double i0) => { return Math.Cos(i0); },
                 SinCosErrorEvaluator(),
                 new[] {
+                    Operation.F64_F64("Fixed64.Cos", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.Cos(i0[i]); } }),
+                    Operation.F64_F64("Fixed64.CosFast", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.CosFast(i0[i]); } }),
+                    Operation.F64_F64("Fixed64.CosFastest", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.CosFastest(i0[i]); } }),
                     Operation.F32_F32("Fixed32.Cos", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.Cos(i0[i]); } }),
                     Operation.F32_F32("Fixed32.CosFast", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.CosFast(i0[i]); } }),
                     Operation.F32_F32("Fixed32.CosFastest", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.CosFastest(i0[i]); } }),
@@ -1189,6 +1302,9 @@ namespace FixPointCSTest
                 (double i0) => { return Math.Tan(i0); },
                 RelativeUnaryErrorEvaluator(16.0),
                 new[] {
+                    Operation.F64_F64("Fixed64.Tan", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.Tan(i0[i]); } }),
+                    Operation.F64_F64("Fixed64.TanFast", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.TanFast(i0[i]); } }),
+                    Operation.F64_F64("Fixed64.TanFastest", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.TanFastest(i0[i]); } }),
                     Operation.F32_F32("Fixed32.Tan", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.Tan(i0[i]); } }),
                     Operation.F32_F32("Fixed32.TanFast", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.TanFast(i0[i]); } }),
                     Operation.F32_F32("Fixed32.TanFastest", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.TanFastest(i0[i]); } }),
@@ -1204,6 +1320,9 @@ namespace FixPointCSTest
                 (double i0) => { return Math.Asin(i0); },
                 AbsoluteUnaryErrorEvaluator(),
                 new[] {
+                    Operation.F64_F64("Fixed64.Asin", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.Asin(i0[i]); } }),
+                    Operation.F64_F64("Fixed64.AsinFast", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.AsinFast(i0[i]); } }),
+                    Operation.F64_F64("Fixed64.AsinFastest", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.AsinFastest(i0[i]); } }),
                     Operation.F32_F32("Fixed32.Asin", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.Asin(i0[i]); } }),
                     Operation.F32_F32("Fixed32.AsinFast", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.AsinFast(i0[i]); } }),
                     Operation.F32_F32("Fixed32.AsinFastest", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.AsinFastest(i0[i]); } }),
@@ -1217,6 +1336,9 @@ namespace FixPointCSTest
                 (double i0) => { return Math.Acos(i0); },
                 AbsoluteUnaryErrorEvaluator(),
                 new[] {
+                    Operation.F64_F64("Fixed64.Acos", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.Acos(i0[i]); } }),
+                    Operation.F64_F64("Fixed64.AcosFast", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.AcosFast(i0[i]); } }),
+                    Operation.F64_F64("Fixed64.AcosFastest", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.AcosFastest(i0[i]); } }),
                     Operation.F32_F32("Fixed32.Acos", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.Acos(i0[i]); } }),
                     Operation.F32_F32("Fixed32.AcosFast", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.AcosFast(i0[i]); } }),
                     Operation.F32_F32("Fixed32.AcosFastest", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.AcosFastest(i0[i]); } }),
@@ -1230,6 +1352,9 @@ namespace FixPointCSTest
                 (double i0) => { return Math.Atan(i0); },
                 AbsoluteUnaryErrorEvaluator(),
                 new[] {
+                    Operation.F64_F64("Fixed64.Atan", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.Atan(i0[i]); } }),
+                    Operation.F64_F64("Fixed64.AtanFast", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.AtanFast(i0[i]); } }),
+                    Operation.F64_F64("Fixed64.AtanFastest", (int n, F64[] i0, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.AtanFastest(i0[i]); } }),
                     Operation.F32_F32("Fixed32.Atan", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.Atan(i0[i]); } }),
                     Operation.F32_F32("Fixed32.AtanFast", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.AtanFast(i0[i]); } }),
                     Operation.F32_F32("Fixed32.AtanFastest", (int n, F32[] i0, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.AtanFastest(i0[i]); } }),
@@ -1246,6 +1371,9 @@ namespace FixPointCSTest
                 (double i0, double i1) => { return Math.Atan2(i0, i1); },
                 AbsoluteBinaryErrorEvaluator(),
                 new[] {
+                    Operation.F64_F64_F64("Fixed64.Atan2", (int n, F64[] i0, F64[] i1, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.Atan2(i0[i], i1[i]); } }),
+                    Operation.F64_F64_F64("Fixed64.Atan2Fast", (int n, F64[] i0, F64[] i1, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.Atan2Fast(i0[i], i1[i]); } }),
+                    Operation.F64_F64_F64("Fixed64.Atan2Fastest", (int n, F64[] i0, F64[] i1, F64[] o) => { for (int i=0; i<n; i++) { o[i] = F64.Atan2Fastest(i0[i], i1[i]); } }),
                     Operation.F32_F32_F32("Fixed32.Atan2", (int n, F32[] i0, F32[] i1, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.Atan2(i0[i], i1[i]); } }),
                     Operation.F32_F32_F32("Fixed32.Atan2Fast", (int n, F32[] i0, F32[] i1, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.Atan2Fast(i0[i], i1[i]); } }),
                     Operation.F32_F32_F32("Fixed32.Atan2Fastest", (int n, F32[] i0, F32[] i1, F32[] o) => { for (int i=0; i<n; i++) { o[i] = F32.Atan2Fastest(i0[i], i1[i]); } }),
